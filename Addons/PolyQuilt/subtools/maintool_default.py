@@ -25,10 +25,12 @@ from ..utils.mouse_event_util import ButtonEventUtil, MBEventType
 from .subtool import *
 from .subtool_makepoly import *
 from .subtool_knife import *
-from .subtool_edge_slice import *
 from .subtool_edgeloop_cut import *
+from .subtool_edgeloop_dissolve import *
 from .subtool_edge_extrude import *
 from .subtool_vert_extrude import *
+from .subtool_face_extrude import *
+from .subtool_face_insert import *
 from .subtool_move import *
 from .subtool_fin_slice import *
 from .subtool_polypen import *
@@ -39,7 +41,6 @@ class MainToolDefault(MainTool) :
     def __init__(self,op,currentTarget, button) :
         super().__init__(op,currentTarget, button)        
 
-    @staticmethod
     def LMBEventCallback(self , event ):
         self.debugStr = str(event.type)
 
@@ -48,7 +49,7 @@ class MainToolDefault(MainTool) :
 
         elif event.type == MBEventType.Click :
             if self.currentTarget.isVert or self.currentTarget.isEmpty or self.currentTarget.isEdge:
-                self.SetSubTool( SubToolMakePoly(self.operator,self.currentTarget , self.mouse_pos ) )
+                self.SetSubTool( SubToolMakePoly(self.operator,self.currentTarget , self.buttonType ) )
 
         elif event.type == MBEventType.LongClick :
             if self.currentTarget.isVert :
@@ -67,18 +68,25 @@ class MainToolDefault(MainTool) :
                     tools.append(SubToolPolyPen(self.operator,self.currentTarget))
                 else :
                     if len(self.currentTarget.element.link_faces) > 0 :
-                        tools.append(SubToolEdgeSlice(self.operator,self.currentTarget, self.mouse_pos))
-                    if SubToolEdgeloopCut.Check( self ,self.currentTarget) : 
-                        tools.append(SubToolEdgeloopCut(self.operator,self.currentTarget))
+                        tools.append(SubToolEdgeLoopCut(self.operator,self.currentTarget, self.buttonType ))
+                    if SubToolEdgeloopDissolve.Check( self ,self.currentTarget) : 
+                        tools.append(SubToolEdgeloopDissolve(self.operator,self.currentTarget))
                     if SubToolEdgeExtrude.Check( self ,self.currentTarget) : 
                         tools.append(SubToolEdgeExtrude(self.operator,self.currentTarget,False))
                 self.SetSubTool( tools )
             elif self.currentTarget.isVert :
                 tools = []
                 tools.append(SubToolFinSlice(self.operator,self.currentTarget ))
+                if SubToolFaceInsert.Check( self ,self.currentTarget ) :
+                    tools.append(SubToolFaceInsert(self.operator,self.currentTarget ))
                 if SubToolVertExtrude.Check( self ,self.currentTarget ) :
                     tools.append(SubToolVertExtrude(self.operator,self.currentTarget))
                 self.SetSubTool( tools )
+            elif self.currentTarget.isFace :
+                if not QSnap.is_active() :
+                    tools = []
+                    tools.append(SubToolFaceExtrude(self.operator,self.currentTarget , self.mouse_pos ))
+                    self.SetSubTool( tools )
             elif self.currentTarget.isEmpty :
                 self.SetSubTool( SubToolKnife(self.operator,self.currentTarget , self.LMBEvent.PressPos ) )   
 
@@ -97,7 +105,14 @@ class MainToolDefault(MainTool) :
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
         if element != None and gizmo.bmo != None :
-            return element.DrawFunc( gizmo.bmo.obj , gizmo.preferences.highlight_color , gizmo.preferences , True )
+            funcs = []
+            funcs.append( element.DrawFunc( gizmo.bmo.obj , gizmo.preferences.highlight_color , gizmo.preferences , True ) )
+
+#            if not QSnap.is_active() :
+#                if element.isFace :
+#                    funcs.append( element.draw_face_center_marker_func( gizmo.preferences.highlight_color , element.is_hit_center() , element.is_hit_center() ) )
+
+            return funcs
         return None
 
     def OnDraw( self , context  ) :

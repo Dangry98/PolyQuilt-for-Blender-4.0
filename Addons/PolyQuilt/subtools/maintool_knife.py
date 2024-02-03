@@ -25,10 +25,7 @@ from ..utils.mouse_event_util import ButtonEventUtil, MBEventType
 from .subtool import *
 from .subtool_makepoly import *
 from .subtool_knife import *
-from .subtool_edge_slice import *
 from .subtool_edgeloop_cut import *
-from .subtool_edge_extrude import *
-from .subtool_vert_extrude import *
 from .subtool_move import *
 from .subtool_fin_slice import *
 from .subtool_polypen import *
@@ -39,7 +36,6 @@ class MainToolKnife(MainTool) :
     def __init__(self,op,currentTarget, button) :
         super().__init__(op,currentTarget, button , no_hold = True )        
 
-    @staticmethod
     def LMBEventCallback(self , event ):
         self.debugStr = str(event.type)
 
@@ -47,7 +43,7 @@ class MainToolKnife(MainTool) :
             self.isExit = True
         elif event.type == MBEventType.Click or event.type == MBEventType.LongClick:
             if self.currentTarget.isVert or self.currentTarget.isEmpty or self.currentTarget.isEdge:
-                self.SetSubTool( SubToolMakePoly(self.operator,self.currentTarget , self.mouse_pos ) )
+                self.SetSubTool( SubToolMakePoly(self.operator,self.currentTarget , self.buttonType ) )
         elif event.type == MBEventType.Drag or event.type == MBEventType.LongPressDrag:
             self.SetSubTool( SubToolKnife(self.operator,self.currentTarget , self.LMBEvent.PressPos ) )   
 

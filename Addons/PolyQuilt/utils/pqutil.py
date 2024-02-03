@@ -40,6 +40,13 @@ class Plane :
         vector.normalize()
         return Plane( origin , vector )
 
+    def from_screen_near( context ) :
+        rv3d = context.region_data
+        origin = rv3d.view_matrix.inverted() @ Vector( (0,0,0) )
+        vector = -rv3d.view_matrix.inverted().col[2].xyz
+        vector.normalize()
+        return Plane( origin , vector )
+
     def from_screen_slice( context , startPos , endPos ) :
         rv3d = context.region_data   
         region = context.region
@@ -81,6 +88,9 @@ class Plane :
     def distance_point( self , pt :Vector ) :
         d = mathutils.geometry.distance_point_to_plane(pt , self.origin , self.vector )
         return  d
+
+    def closest_point( self , pt : Vector ) :
+        return pt + self.vector * self.distance_point(pt)
 
     def world_to_object( self , obj ) :
         matrix = obj.matrix_world
@@ -124,6 +134,11 @@ class Ray :
         if coord == None :
             return None
         return Ray.from_screen( context , coord)
+
+    @staticmethod
+    def from_line( p0 : mathutils.Vector , p1 : mathutils.Vector) :
+        return Ray( p0 , p1 - p0 )
+
 
     def world_to_object( self , obj ) :
         matrix_inv = obj.matrix_world.inverted()
@@ -189,6 +204,8 @@ class Ray :
         
         return v0 + (v1-v0) * val
 
+    def closest_point( self , c ) :
+        return self.origin + self.vector.dot( c - self.origin  ) * self.vector
 
     @property
     def invert( self ) :
@@ -246,32 +263,6 @@ def region_2d_to_vector_3d(region, rv3d, coord):
 
 
 def region_2d_to_origin_3d(region, rv3d, coord, clamp=None):
-    """
-    Return the 3d view origin from the region relative 2d coords.
-
-    .. note::
-
-       Orthographic views have a less obvious origin,
-       the far clip is used to define the viewport near/far extents.
-       Since far clip can be a very large value,
-       the result may give with numeric precision issues.
-
-       To avoid this problem, you can optionally clamp the far clip to a
-       smaller value based on the data you're operating on.
-
-    :arg region: region of the 3D viewport, typically bpy.context.region.
-    :type region: :class:`bpy.types.Region`
-    :arg rv3d: 3D region data, typically bpy.context.space_data.region_3d.
-    :type rv3d: :class:`bpy.types.RegionView3D`
-    :arg coord: 2d coordinates relative to the region;
-       (event.mouse_region_x, event.mouse_region_y) for example.
-    :type coord: 2d vector
-    :arg clamp: Clamp the maximum far-clip value used.
-       (negative value will move the offset away from the view_location)
-    :type clamp: float or None
-    :return: The origin of the viewpoint in 3d space.
-    :rtype: :class:`mathutils.Vector`
-    """
     viewinv = rv3d.view_matrix.inverted()
 
     if rv3d.is_perspective:
@@ -302,23 +293,7 @@ def region_2d_to_origin_3d(region, rv3d, coord, clamp=None):
 
 
 def region_2d_to_location_3d(region, rv3d, coord, depth_location):
-    """
-    Return a 3d location from the region relative 2d coords, aligned with
-    *depth_location*.
 
-    :arg region: region of the 3D viewport, typically bpy.context.region.
-    :type region: :class:`bpy.types.Region`
-    :arg rv3d: 3D region data, typically bpy.context.space_data.region_3d.
-    :type rv3d: :class:`bpy.types.RegionView3D`
-    :arg coord: 2d coordinates relative to the region;
-       (event.mouse_region_x, event.mouse_region_y) for example.
-    :type coord: 2d vector
-    :arg depth_location: the returned vectors depth is aligned with this since
-       there is no defined depth with a 2d region input.
-    :type depth_location: 3d vector
-    :return: normalized 3d vector.
-    :rtype: :class:`mathutils.Vector`
-    """
     from mathutils import Vector
 
     coord_vec = region_2d_to_vector_3d(region, rv3d, coord)
@@ -443,3 +418,88 @@ def CalcRateEdgeRay( obj , context , edge , vert , coord , ray , dist ) :
         return 0.0
     else :
         return max( 0 , min( 1 , d0 / dt ))        
+
+def sort_edgeloop( loop ) :
+    '''
+    sorting edgeloop
+    '''
+
+    if len(loop) == 1 :
+        return loop , [loop[0].verts[0],loop[0].verts[1]]
+
+    start_edge = None
+    start_vert = None
+    for edge in loop :
+        for vert in edge.verts :
+            if len( [ e for e in loop if vert in e.verts ] ) == 1 :
+                start_edge = edge 
+                start_vert = vert
+
+    if start_edge == None :
+        # ループしている可能性
+        start_edge = loop[0]
+        start_vert = loop[0].verts[0]
+
+    cur_edge = start_edge
+    cur_vert = start_edge.other_vert(start_vert)
+    ret_edges = []
+    ret_verts = [start_vert]
+    for i in range(0,len(loop)) :
+        ret_edges.append(cur_edge)
+        ret_verts.append(cur_vert)
+        nexts = [ e for e in cur_vert.link_edges if e != cur_edge and e in loop and e != start_edge ]
+        if len( nexts ) != 1  :
+            break 
+        cur_edge = nexts[0]
+        cur_vert = cur_edge.other_vert(cur_vert)
+
+    return ret_edges , ret_verts
+
+def make_slice_planes( context ,startPos , endPos ):
+    '''
+    make screenspace cut planes
+    '''
+
+    slice_plane = Plane.from_screen_slice( context,startPos , endPos )
+
+    ray0 = Ray.from_screen( context , startPos )
+    vec0 = slice_plane.vector.cross(ray0.vector).normalized()
+    ofs0 = vec0 * 0.0001
+    plane0 = Plane( ray0.origin - ofs0 , vec0 )
+
+    ray1 = Ray.from_screen( context ,endPos )
+    vec1 = slice_plane.vector.cross(ray1.vector).normalized()
+    ofs1 = vec1 * 0.0001
+    plane1 = Plane( ray1.origin + ofs1 , -vec1 )
+
+    return slice_plane , plane0 , plane1
+
+def grouping_loop_edge( edges ) :
+    '''
+    make group edgeloop
+    '''
+    selected ={ edge : -1 for edge in edges }
+    index = 0
+    for edge in list( selected.keys() ) :
+        if selected[edge] == -1 :
+            selected[edge] = index
+            for vert in edge.verts :
+                tar = edge
+                while tar :
+                    boundarys = [ e for e in vert.link_edges if e != tar and e in selected.keys() and selected[e] == -1 ]
+                    if len(boundarys) == 1 :
+                        tar = boundarys[0]
+                        vert = tar.other_vert(vert)
+                        selected[tar] = index
+                    else :
+                        tar = None
+            index += 1
+
+    group_loops = {}
+    for edge , idx in selected.items() :
+        if idx not in group_loops.keys() :
+            group_loops[idx] = []
+        group_loops[idx].append(edge)
+
+    return list( group_loops.values() )
+

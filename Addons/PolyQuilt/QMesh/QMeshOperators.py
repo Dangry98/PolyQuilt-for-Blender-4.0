@@ -34,7 +34,10 @@ class QMeshOperators :
         self.__btree = None
         self.__kdtree = None
         self.preferences = preferences
-
+        
+    def __del__(self) :
+        del self.__btree
+        del self.__kdtree
 
     def _CheckValid( self , context ) :
         active_obj = context.active_object
@@ -73,18 +76,18 @@ class QMeshOperators :
             self.__kdtree = None
 
 
-    def UpdateMesh( self ) :
-        self.ensure_lookup_table()
+    def UpdateMesh( self , changeTopology = True , loop_triangles = True,destructive = True ) :
         self.bm.normal_update()
-
+        self.ensure_lookup_table()
         self.obj.data.update_gpu_tag()
         self.obj.data.update_tag()
         self.obj.update_tag()
-        bmesh.update_edit_mesh(self.obj.data)
+        bmesh.update_edit_mesh(self.obj.data , loop_triangles = loop_triangles,destructive = destructive )
 #       self.obj.update_from_editmode()
-        self.__btree = None
-        self.__kdtree = None
-        self.current_matrix = None    
+        if changeTopology :
+            self.__btree = None
+            self.__kdtree = None
+            self.current_matrix = None    
 
     @property
     def btree(self):
@@ -128,6 +131,18 @@ class QMeshOperators :
     def world_to_local_pos(  self ,pos : Vector ) :
         return self.obj.matrix_world.inverted() @ pos
 
+    def local_to_world_nrm(  self , norm : Vector ) :
+        p0 = self.obj.matrix_world @ Vector( (0,0,0) )
+        p1 = self.obj.matrix_world @ norm
+        return ( p0 - p1 ).normalized()
+
+    def world_to_local_nrm(  self , norm : Vector ) :
+        inv = self.obj.matrix_world.inverted()
+        p0 = inv @ Vector( (0,0,0) )
+        p1 = inv @ norm
+        return ( p0 - p1 ).normalized()
+
+
     def world_to_2d(  self ,pos : Vector ) :
         return pqutil.location_3d_to_region_2d( pos )
 
@@ -146,6 +161,10 @@ class QMeshOperators :
     @staticmethod
     def zero_pos( pos : Vector ) :
         return Vector( (0,pos[1],pos[2]) )
+
+    @staticmethod
+    def zero_vector( norm : Vector ) :
+        return Vector( (0,norm[1],norm[2]) ).normalized() * norm.length
 
     def zero_pos_w2l( self , pos : Vector ) :
         wp = self.world_to_local_pos(pos)
@@ -169,7 +188,7 @@ class QMeshOperators :
         return self.is_snap2D(t0,t1)
 
     def is_snap2D( self , p0 : Vector  , p1 : Vector  ) :
-        dist = self.preferences.distance_to_highlight * dpm()
+        dist = display.dot( self.preferences.distance_to_highlight )
         return ( p0 - p1 ).length <= dist
 
     def is_x0_snap( self , p  : Vector  ) :
@@ -177,7 +196,7 @@ class QMeshOperators :
         p1 = pqutil.location_3d_to_region_2d( self.mirror_pos_w2l(p) )
         if p0 == None or p1 == None :
             return False
-        dist = self.preferences.distance_to_highlight * dpm()  
+        dist = display.dot(self.preferences.distance_to_highlight )  
         return ( p0 - p1 ).length <= dist
 
     def mirror_world_pos( self , world_pos ) :
@@ -196,7 +215,7 @@ class QMeshOperators :
         c1 = pqutil.location_3d_to_region_2d( self.obj.matrix_world @ v1 )        
         if c0 == None or c1 == None :
             return False
-        radius = self.preferences.distance_to_highlight * dpm()
+        radius = display.dot(self.preferences.distance_to_highlight )
         return (c0-c1).length <= radius 
 
 
@@ -204,7 +223,7 @@ class QMeshOperators :
         vert = self.bm.verts.new( local_pos )
         if self.check_mirror(is_mirror) and self.is_x_zero_pos(local_pos) is False :
             mirror = self.bm.verts.new( self.mirror_pos(local_pos) )
-
+        self.bm.verts.index_update()
         return vert
 
     def AddVertexWorld( self , world_pos : Vector , is_mirror = None ) :
@@ -215,6 +234,8 @@ class QMeshOperators :
     def AddFace( self , verts , normal = None , is_mirror = None ) :
         self.ensure_lookup_table()
         face = self.bm.faces.new( verts )
+        if face == None :
+            return None
 
         linkCount = 0
         for loop in [ l for l in face.loops if not l.edge.is_boundary ] :
@@ -228,7 +249,6 @@ class QMeshOperators :
         if linkCount > 0 :
             face.normal_flip()
             face.normal_update()           
-            isLink = True
 
         if linkCount == 0 and normal != None :
             face.normal_update()
@@ -239,13 +259,14 @@ class QMeshOperators :
                 verts = verts[::-1] 
 
         if self.check_mirror(is_mirror) :
-            mirror = [ self.find_mirror(v,False) for v in verts[::-1] ]
-            mirror = [ m if m != None else self.bm.verts.new( self.mirror_pos(o.co) ) for o,m in zip(verts[::-1] , mirror) ]
+            verts = list(face.verts)[::-1]
+            mirror = [ self.find_mirror(v,False) for v in verts  ]
+            mirror = [ m if m != None else self.bm.verts.new( self.mirror_pos(o.co) ) for o,m in zip(verts, mirror) ]
             self.ensure_lookup_table()
 
             if all(mirror) :
                 if set(verts) ^ set(mirror) :
-                    face_mirror = self.bm.faces.new( mirror )
+                    face_mirror = self.AddFace( mirror , normal , False )
 
         return face
 
@@ -324,19 +345,28 @@ class QMeshOperators :
             mirror_edges = {edge for edge in mirror_edges if edge is not None }
             edges = list( set(edges) | mirror_edges )
 
-        if all( e.is_boundary for e in edges ) :
-            bmesh.ops.delete( self.bm , geom = edges , context = 'EDGES' )
-            return
-
-        verts = set()
+        verts = {}
         for e in edges :
-            verts.add( e.verts[0] )
-            verts.add( e.verts[1] )
+            verts[ e.verts[0] ] = e.is_wire
+            verts[ e.verts[1] ] = e.is_wire
 
+        for edge in edges :
+            if edge.is_valid :
+                if edge.is_boundary :
+                    bmesh.ops.delete( self.bm , geom = [edge] , context = 'EDGES' )
+                elif edge.is_wire :
+                    bmesh.ops.delete( self.bm , geom = [edge] , context = 'EDGES' )
+                else :
+                    bmesh.ops.dissolve_edges( self.bm , edges = [edge] , use_verts = use_verts , use_face_split = use_face_split )
 
-        new_face = bmesh.ops.dissolve_edges( self.bm , edges = edges , use_verts = use_verts , use_face_split = use_face_split )
+        # 独立頂点を削除
+        delete_Verts = [ v for v , w in verts.items() if v.is_valid and len(v.link_edges) == 0 ]
+        bmesh.ops.delete( self.bm , geom = delete_Verts , context = 'VERTS' )
+        delete_Verts = [ v for v , w in verts.items() if v.is_valid and len(v.link_edges) == 1 and not w ]
+        bmesh.ops.delete( self.bm , geom = delete_Verts , context = 'VERTS' )
 
         dissolve_verts = [ v for v in verts if v.is_valid ]
+
         if dissolve_vert_angle > 0 :
             dissolve_verts = self.calc_limit_verts( dissolve_verts , dissolve_vert_angle = dissolve_vert_angle , is_mirror = False )
         if len(dissolve_verts) > 0 :
@@ -511,89 +541,89 @@ class QMeshOperators :
         else:
             return context.scene.display.shading
 
-    @staticmethod
-    def findOutSideLoop( srcVert ) :
-        startEdges = [e for e in srcVert.link_edges if len(e.link_faces) == 1]
-        if len(startEdges) == 0 :
-            return [],[]
-        edges = [ startEdges[0] ]
-        verts = [ srcVert ]
-        vert = edges[0].other_vert(srcVert)
-        while( vert and vert not in verts ) :
-            verts.append( vert )
-            hits = [ e for e in vert.link_edges if len(e.link_faces) == 1 and e not in edges ]
-            if len(hits) == 1 :
-                vert = hits[0].other_vert(vert)
-                edges.append( hits[0] )
-            else :
-                vert = None
-        return edges , verts
 
-    def calc_edge_loop( self , startEdge , check_func = None ) :
-        edges = []
-        verts = []
-
+    def calc_edge_loop( self , startEdge , check_func = None , is_mirror = None ) :
         if not isinstance( startEdge , bmesh.types.BMEdge ) :
-            return edges , verts
+            return [] ,[]
+
+        edges = [startEdge]
+        verts = [startEdge.verts[0],startEdge.verts[1]]
 
         def append( lst , geom ) :
             if geom not in lst :
                 lst.append(geom)
-                if self.is_mirror_mode :
-                    mirror =self.find_mirror( geom )
-                    if mirror :
-                        lst.append( mirror )
 
-        for vert in startEdge.verts :
-            preEdge = startEdge
-            currentV = vert
-            while currentV != None :
-                append(edges , preEdge)
+        def check( src , dst ) :
+            if src != dst :
+                 if len(dst.link_faces) == satrt_link_face_cnt :
+                     if not set(src.link_faces) & set(dst.link_faces) :
+                         src_edges = sum( ( tuple(f.edges) for f in src.link_faces ) , () )
+                         if all( ( set(src_edges) & set( f.edges ) for f in  dst.link_faces  ) )  :
+                             return True
+            return False
 
-                if currentV.is_boundary :
-                    if len( currentV.link_faces )== 2 :
-                        if not any( [ len(f.verts) == 3 for f in currentV.link_faces ] ):
-                            if currentV not in verts :
-                                append(verts , currentV)
-                    break
+        satrt_link_face_cnt = len( startEdge.link_faces )
 
-                if len(currentV.link_faces) == 4 :
-                    faces = set(currentV.link_faces ) ^ set(preEdge.link_faces )
-                    if len( faces ) != 2 :
-                        break
-                    faces = list(faces)
-                    share_edges = set(faces[0].edges) & set(faces[1].edges) & set(currentV.link_edges )
-                    if len(share_edges) != 1 :
-                        break
+        loop_verts = [ (startEdge,startEdge.verts[0] ), (startEdge,startEdge.verts[1]) ]
+        while( len(loop_verts) > 0 ) :
+            cur_edge = loop_verts[-1][0]
+            cur_vert = loop_verts[-1][1]
+            loop_verts.pop(-1)
 
-                    if check_func :
-                        if check_func( preEdge , currentV ) == False :
-                            break
+            if check_func != None and not check_func(cur_edge,cur_vert) :
+                continue
 
-                    preEdge = list(share_edges)[0]
+            est_edges = [ e for e in cur_vert.link_edges if check(cur_edge , e) ]
+            if len(est_edges) == 1 :
+                append_edge = est_edges[0]
+                if len(append_edge.link_faces) == satrt_link_face_cnt and  append_edge not in edges :
+                    other_vert = append_edge.other_vert(cur_vert)
+#                    if other_vert.is_boundary or  len( other_vert.link_faces ) == len(cur_vert.link_faces ) :
+                    loop_verts.append( (append_edge , other_vert ) )
+                    append( edges , append_edge)
+                    if cur_vert not in verts :
+                        append( verts , cur_vert )
 
-                    if currentV not in verts :
-                        append(verts , currentV)
+        if self.check_mirror(is_mirror) :
+            edges.extend( [ m for m in ( self.find_mirror( e ) for e in edges ) if m and m not in edges ] )
+            verts.extend( [ m for m in ( self.find_mirror( v ) for v in verts ) if m and m not in verts ] )
 
-                elif len(currentV.link_faces) == 2 :
-                    share_edges = [ e for e in currentV.link_edges if e != preEdge ]
-                    if len(share_edges) != 1 :
-                        break
-                    preEdge = share_edges[0]
-                else :
-                    break
-
-
-                currentV = preEdge.other_vert(currentV)
-                if currentV == vert:
-                    break
         return edges , verts
 
-    def do_edge_loop_cut( self , edges , verts ) :
-        bmesh.ops.dissolve_edges( self.bm , edges = edges , use_verts = False , use_face_split = False )  
-        vs = [ v for v in verts if v.is_valid ]
-        bmesh.ops.dissolve_verts( self.bm , verts = vs , use_face_split = True , use_boundary_tear = False )        
-  
+
+
+    def collect_loops( self , source_loop : bmesh.types.BMLoop , edgeloops ) :
+        def next( loop , rh , start ) :
+            if rh :
+                next_loop = loop.link_loop_next
+                radial = next_loop.link_loop_radial_next
+            else :
+                next_loop = loop.link_loop_prev
+                radial = next_loop.link_loop_radial_next
+
+            if next_loop != radial :
+                t = rh if next_loop.vert != radial.vert else not rh
+                link = radial.link_loop_next if t else radial.link_loop_prev
+                if link != start and link.edge in edgeloops :
+                    return link , t
+
+            return None , rh
+
+        lnext = source_loop
+        rh = True
+        eol = None
+        while( lnext ) :
+            eol = lnext
+            lnext , rh = next(lnext , rh , source_loop )
+
+        loops = []
+        rh = not rh
+        lnext = eol
+        while( lnext ) :
+            loops.append(lnext)
+            lnext , rh = next(lnext , rh , eol)
+
+        return loops
 
     @staticmethod
     def calc_loop_face( edge ) :
@@ -625,7 +655,76 @@ class QMeshOperators :
         return loops
 
 
-    def calc_shortest_pass( self , bm , start , end ) :
+    def calc_edge_boundary_loop( self , startEdge , check_func = None , is_mirror = None ) :
+        if not isinstance( startEdge , bmesh.types.BMEdge ) :
+            return [] ,[]
+
+        if startEdge.is_manifold :
+            return [] ,[]
+
+        edges = [startEdge]
+        verts = [startEdge.verts[0],startEdge.verts[1]]
+
+        for vert in verts :
+            cur = vert
+            while(cur) :
+                if len( [ e for e in cur.link_edges if e in edges ] ) == 2 :
+                    break
+
+                links = [ e for e in cur.link_edges if not e.is_manifold and e not in edges ]
+                if len(links) == 1 :
+                    next = links[0]
+                    edges.append( next )
+                    cur = next.other_vert(cur)
+                    if cur not in verts :
+                        verts.append(cur)
+                    else :
+                        break
+                else :
+                    break
+        return edges , verts
+
+
+    def select_flush( self ) :
+        for face in self.bm.faces :
+            face.select_set(False)
+        for edge in self.bm.edges :
+            edge.select_set(False)
+        for vert in self.bm.verts :
+            vert.select_set(False)
+        self.bm.select_history.clear()                        
+        self.bm.select_flush(False)
+
+    def select_component( self , component , select = True ) :
+        select_mode_log = self.bm.select_mode
+        if isinstance( component , bmesh.types.BMVert ) :
+            self.bm.select_mode = {'VERT'}
+            component.select_set(select)
+        elif isinstance( component , bmesh.types.BMEdge ) :
+            self.bm.select_mode = {'EDGE'}
+            component.select_set(select)
+        elif isinstance( component , bmesh.types.BMFace ) :
+            self.bm.select_mode = {'FACE'}
+            component.select_set(select)
+        else :
+            return
+
+        if select :
+            self.bm.select_history.add( component )
+        else :
+            self.bm.select_history.discard( component )
+
+        self.bm.select_mode = select_mode_log
+
+    def select_components( self , components , select = True ) :
+        for component in components :
+            self.select_component(component,select)
+            if select :
+                self.bm.select_history.add( component )
+            else :
+                self.bm.select_history.discard( component )
+
+    def calc_shortest_pass( self , bm , start , end , boundaryOnly = False ) :
         from .QMesh import SelectStack        
 
         if isinstance( start , bmesh.types.BMFace ) :
@@ -675,6 +774,11 @@ class QMeshOperators :
         select = SelectStack( bpy.context , bm )
         select.push()
 
+        if boundaryOnly :
+            hides = [ e for e in bm.edges if not (e.is_boundary or e.is_wire) and not e.hide ]
+            for hide in hides :
+                hide.hide_set(True)
+
         if isinstance( start , bmesh.types.BMVert ) and isinstance( end , bmesh.types.BMEdge ) :
             c0 = calc( start , end.verts[0] )
             c1 = calc( start , end.verts[1] )
@@ -695,4 +799,9 @@ class QMeshOperators :
             collect = calc( start , end )
 
         select.pop()
+
+        if boundaryOnly :
+            for hide in hides :
+                hide.hide_set(False)
+
         return ( collect , [] )

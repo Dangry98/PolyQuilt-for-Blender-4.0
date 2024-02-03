@@ -65,12 +65,12 @@ class SubToolSeamLoop(SubToolSeam) :
 
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
-        if element != None and gizmo.bmo != None :
+        if element.isEdge and gizmo.bmo != None :
             edges = cls.find_seam_loop( gizmo.bmo , element.element )
             if edges :
-                alpha = gizmo.preferences.highlight_face_alpha
+                alpha = 1
                 vertex_size = gizmo.preferences.highlight_vertex_size        
-                width = 5        
+                width = 1.65
                 if not element.element.seam :
                     color = bpy.context.preferences.themes["Default"].view_3d.edge_seam
                     color = (color[0],color[1],color[2],1)
@@ -81,9 +81,9 @@ class SubToolSeamLoop(SubToolSeam) :
                 if gizmo.bmo.is_mirror_mode :
                     mirrors = [ gizmo.bmo.find_mirror(m) for m in edges ]
                     mirrors = [ m for m in mirrors if m ]
-                def func() :
-                    draw_util.drawElementsHilight3D( gizmo.bmo.obj , edges , vertex_size , width , alpha , color )
-                    if mirrors :
-                        draw_util.drawElementsHilight3D( gizmo.bmo.obj , mirrors , vertex_size , width , alpha * 0.5 , color )        
-                return func
+                funcs = []
+                funcs.append(draw_util.drawElementsHilight3DFunc( gizmo.bmo.obj , gizmo.bmo.bm, edges , vertex_size , width , alpha , color ))
+                if mirrors :
+                    funcs.append( draw_util.drawElementsHilight3DFunc( gizmo.bmo.obj  , gizmo.bmo.bm, mirrors , vertex_size , width , alpha * 0.5 , color ))
+                return funcs
         return None

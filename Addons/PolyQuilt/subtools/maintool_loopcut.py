@@ -25,8 +25,8 @@ from ..utils.mouse_event_util import ButtonEventUtil, MBEventType
 from .subtool import *
 from .subtool_makepoly import *
 from .subtool_knife import *
-from .subtool_edge_slice import *
 from .subtool_edgeloop_cut import *
+from .subtool_edgeloop_dissolve import *
 from .subtool_edge_extrude import *
 from .subtool_vert_extrude import *
 from .subtool_move import *
@@ -39,7 +39,6 @@ class MainToolLoopCut(MainTool) :
     def __init__(self,op,currentTarget, button) :
         super().__init__(op,currentTarget, button , no_hold = True )        
 
-    @staticmethod
     def LMBEventCallback(self , event ):
         last_mouse_pos = event.mouse_pos
         self.debugStr = str(event.type)
@@ -48,13 +47,13 @@ class MainToolLoopCut(MainTool) :
             self.isExit = True
 
         elif event.type == MBEventType.Down :
-            if SubToolEdgeSlice.Check( self , self.currentTarget ):
-                self.SetSubTool( SubToolEdgeSlice(self.operator,self.currentTarget, self.mouse_pos ) )
+            if SubToolEdgeLoopCut.Check( self , self.currentTarget ):
+                self.SetSubTool( SubToolEdgeLoopCut(self.operator,self.currentTarget, self.buttonType ) )
 
     @classmethod
     def DrawHighlight( cls , gizmo , target ) :
-        if SubToolEdgeSlice.Check( None , target ) :
-            return SubToolEdgeSlice.DrawHighlight( gizmo , target )
+        if SubToolEdgeLoopCut.Check( None , target ) :
+            return SubToolEdgeLoopCut.DrawHighlight( gizmo , target )
         return None
 
     @staticmethod

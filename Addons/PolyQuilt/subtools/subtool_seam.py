@@ -51,7 +51,7 @@ class SubToolSeam(MainTool) :
             if self.currentTarget.isNotEmpty :
                 vt = None
                 if self.startTarget.isEdge :
-                    vt = self.bmo.highlight.check_hit_element_vert( self.startTarget.element , self.mouse_pos , self.preferences.distance_to_highlight * dpm())
+                    vt = self.bmo.highlight.check_hit_element_vert( self.startTarget.element , self.mouse_pos , display.dot( self.preferences.distance_to_highlight ))
                 if vt :
                     e = self.find_seam_loop( self.bmo , self.startTarget.element )
                     self.removes = (e,[])
@@ -74,11 +74,12 @@ class SubToolSeam(MainTool) :
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
         if element != None and gizmo.bmo != None :
+            width = gizmo.preferences.highlight_line_width
             if element.isEdge and element.element.seam :
                 color = (0,0,0,1)
             else :
                 color = bpy.context.preferences.themes["Default"].view_3d.edge_seam
-            return element.DrawFunc( gizmo.bmo.obj , (color[0],color[1],color[2],1) , gizmo.preferences , marker = False , edge_pivot = False , width = 5 )
+            return element.DrawFunc( gizmo.bmo.obj , (color[0],color[1],color[2],1) , gizmo.preferences , marker = False , edge_pivot = False , width = width )
         return None
 
     def OnDraw( self , context  ) :
@@ -86,7 +87,7 @@ class SubToolSeam(MainTool) :
 
     def OnDraw3D( self , context  ) :
         if self.removes[0] :
-            alpha = self.preferences.highlight_face_alpha
+            alpha = 1
             vertex_size = self.preferences.highlight_vertex_size        
             width = 5        
             if all( isinstance( e , bmesh.types.BMEdge ) and e.seam for e in self.removes[0] )  :
@@ -95,7 +96,7 @@ class SubToolSeam(MainTool) :
                 color = bpy.context.preferences.themes["Default"].view_3d.edge_seam
                 color = (color[0],color[1],color[2],1)
 
-            draw_util.drawElementsHilight3D( self.bmo.obj , self.removes[0] , vertex_size , width , alpha , color )
+            draw_util.drawElementsHilight3D( self.bmo.obj , self.bmo.bm , self.removes[0] , vertex_size , width , alpha , color )
             if self.bmo.is_mirror_mode :
                 mirrors = [ self.bmo.find_mirror(m) for m in self.removes[0] ]
                 mirrors = [ m for m in mirrors if m ]

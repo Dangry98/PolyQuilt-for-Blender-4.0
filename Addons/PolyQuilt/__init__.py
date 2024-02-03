@@ -13,9 +13,9 @@
 
 bl_info = {
     "name" : "PolyQuilt",
-    "author" : "Sakana3",
-    "version": (1, 3, 1),
-    "blender" : (2, 83, 0),
+    "author" : "Sakana3, port to 4.0 by Dangry",
+    "version": (1, 5, 2),
+    "blender" : (3, 60, 0),
     "location": "View3D > Mesh > PolyQuilt",
     "description": "Lowpoly Tool",
     "warning" : "",
@@ -37,14 +37,18 @@ from .translation import pq_translation_dict
 
 classes = (
     MESH_OT_poly_quilt ,
-    MESH_OT_poly_quilt_brush_size ,
+    MESH_OT_poly_quilt_retopo ,   
     MESH_OT_poly_quilt_daemon ,
     PQ_OT_SetupUnityLikeKeymap ,
     PolyQuiltPreferences ,
     PQ_OT_CheckAddonUpdate ,
     PQ_OT_UpdateAddon ,
     VIEW3D_PT_tools_polyquilt_options ,
+    VIEW3D_PT_tools_polyquilt_gpencil ,
     PQ_OT_DirtyKeymap ,
+    pq_operator_add_empty_object.MESH_OT_PolyQuilt_Gpenci_Tools ,
+    pq_operator_add_empty_object.MESH_OT_GPencil_2_Edge ,
+    pq_operator_add_empty_object.OBJECT_OT_add_object
 ) + gizmo_preselect.all_gizmos
 
 
@@ -53,13 +57,10 @@ def register():
     register_icons()
     register_updater(bl_info)
 
-    # 空メッシュ追加
-    bpy.utils.register_class(pq_operator_add_empty_object.OBJECT_OT_add_object)
-    bpy.utils.register_manual_map(pq_operator_add_empty_object.add_object_manual_map)
-    bpy.types.VIEW3D_MT_mesh_add.append(pq_operator_add_empty_object.add_object_button)
-
     for cls in classes:
         bpy.utils.register_class(cls)
+
+    bpy.types.VIEW3D_MT_mesh_add.append(pq_operator_add_empty_object.add_object_button)
 
     for tool in PolyQuiltTools :
         bpy.utils.register_tool(tool['tool'] ,  after = tool['after'] , group = tool['group'] )
@@ -71,8 +72,6 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)        
 
-    bpy.utils.unregister_class(pq_operator_add_empty_object.OBJECT_OT_add_object)
-    bpy.utils.unregister_manual_map(pq_operator_add_empty_object.add_object_manual_map)
     bpy.types.VIEW3D_MT_mesh_add.remove(pq_operator_add_empty_object.add_object_button)
 
     unregister_icons()

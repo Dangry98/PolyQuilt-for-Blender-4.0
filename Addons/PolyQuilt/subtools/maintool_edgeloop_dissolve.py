@@ -24,8 +24,8 @@ from ..QMesh import *
 from ..utils.mouse_event_util import ButtonEventUtil, MBEventType
 from .subtool import *
 from .subtool_knife import *
-from .subtool_edge_slice import *
 from .subtool_edgeloop_cut import *
+from .subtool_edgeloop_dissolve import *
 from .subtool_delete import *
 
 class MainToolEdgeLoopDissolve(MainTool) :
@@ -50,7 +50,7 @@ class MainToolEdgeLoopDissolve(MainTool) :
         elif event.type == self.buttonType : 
             if event.value == 'RELEASE' :
                 if self.removes :
-                    self.bmo.dissolve_edges( self.removes , use_verts = False , use_face_split = False , dissolve_vert_angle=0 )
+                    self.bmo.dissolve_edges( self.removes , use_verts = False , use_face_split = False , dissolve_vert_angle =self.preferences.vertex_dissolve_angle )
                     self.bmo.UpdateMesh()                    
                 return 'FINISHED'
         elif event.type == 'RIGHTMOUSE': 
@@ -65,18 +65,18 @@ class MainToolEdgeLoopDissolve(MainTool) :
         vertex_size = gizmo.preferences.highlight_vertex_size        
         width = gizmo.preferences.highlight_line_width        
         color = gizmo.preferences.delete_color         
-        return draw_util.drawElementsHilight3DFunc( gizmo.bmo.obj , e , vertex_size , width , alpha , color )        
+        return draw_util.drawElementsHilight3DFunc( gizmo.bmo.obj , gizmo.bmo.bm , e , vertex_size , width , alpha , color )        
 
     def OnDraw( self , context  ) :
         pass
 
     def OnDraw3D( self , context  ) :
         if self.currentTarget.isEdge :        
-            alpha = self.preferences.highlight_face_alpha
+            alpha = 1
             vertex_size = self.preferences.highlight_vertex_size        
             width = self.preferences.highlight_line_width        
             color = self.preferences.delete_color         
-            draw_util.drawElementsHilight3D( self.bmo.obj , self.removes , vertex_size , width , alpha , color )        
+            draw_util.drawElementsHilight3D( self.bmo.obj , self.bmo.bm, self.removes , vertex_size , width , alpha , color )        
 
     def OnExit( self ) :
         pass

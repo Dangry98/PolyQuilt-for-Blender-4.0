@@ -20,6 +20,7 @@ import collections
 from mathutils import *
 from ..utils import pqutil
 from ..utils import draw_util
+from ..utils import dpi
 from ..utils.dpi import *
 
 __all__ = ['ElementItem']
@@ -46,13 +47,29 @@ class ElementItem :
         self.__dist: float = dist
         self.__mirror = None
         self.__qmesh = qmesh
-        self.__mirror = None
         self.__div = 0
         self.setup_mirror()
 
+    def CheckValid( self , qmesh ) :
+        if qmesh != self.__qmesh :
+            self.__qmesh = qmesh
+            if self.isVert :
+                element = self.__qmesh.bm.verts[self.__index]
+            elif self.isEdge :
+                element = self.__qmesh.bm.edges[self.__index]
+            elif self.isFace :
+                element = self.__qmesh.bm.faces[self.__index]
+            else :
+                element = None
+            self.__element = element
+            self.__mirror = None
+            self.__qmesh = qmesh
+            self.__div = 0            
+            self.setup_mirror()
+
     @property
     def bm( self ) :
-        return self.qmesh.bm
+        return self.__qmesh.bm if self.__qmesh else None
 
     @property
     def index(self):
@@ -60,7 +77,7 @@ class ElementItem :
 
     def update_index( self ) :
         if self.__element :
-            self.__index = __element.index
+            self.__index = self.__element.index
 
     def update_element( self ) :
         self.__element = self.element
@@ -76,13 +93,16 @@ class ElementItem :
         return None
 
 
-    def setup_mirror( self ) :
-        if self.__qmesh is not None :
-            is_mirror_mode = self.__qmesh.is_mirror_mode
-            if self.__qmesh.is_mirror_mode :
-                self.__mirror = self.__qmesh.find_mirror( self.element )
+    def setup_mirror( self , mirror = None ) :
+        if mirror != None :
+            self.__mirror = mirror
         else :
-            self.__mirror = None
+            if self.__qmesh is not None :
+                is_mirror_mode = self.__qmesh.is_mirror_mode
+                if self.__qmesh.is_mirror_mode :
+                    self.__mirror = self.__qmesh.find_mirror( self.element )
+            else :
+                self.__mirror = None
 
     def set_snap_div( self , div : int ) :
         self.__div = div
@@ -98,7 +118,7 @@ class ElementItem :
                     p = p0.lerp( p1 , r )
                     v = self.__qmesh.local_to_2d( p )
                     l = ( self.__coord - v ).length
-                    if l <= self.__qmesh.preferences.distance_to_highlight* dpm() :
+                    if l <= display.dot( self.__qmesh.preferences.distance_to_highlight ) :
                         if dst > l :
                             dst = l
                             val = p
@@ -217,6 +237,58 @@ class ElementItem :
         return self.__type
 
     @property
+    def loops( self ) :
+        if self.isEdge :        
+            if not hasattr( self , "__loop" ) :
+                self.__loop , v = self.__qmesh.calc_edge_loop( self.element , is_mirror = False )
+            return self.__loop
+        return []
+
+    @property
+    def mirror_loops( self ) :
+        if self.isEdge :        
+            if not hasattr( self , "__mirror_loop" ) :
+                if self.mirror != None :
+                    self.__mirror_loop = [ t for t , s in [ (self.__qmesh.find_mirror(e,False) , e) for e in self.loops ] if t ]
+                else :
+                    self.__mirror_loop = []
+            return self.__mirror_loop
+        return []
+
+    @property
+    def both_loops( self ) :
+        mp = [ m for m in self.mirror_loops if m not in self.loops ]
+        if mp :
+            return self.loops + mp
+        return self.loops
+
+    @property
+    def rings( self ) :
+        if self.isEdge :        
+            if not hasattr( self , "__rings" ) :
+                self.__rings , v = self.__qmesh.calc_edge_boundary_loop( self.element , is_mirror = False )
+            return self.__rings
+        return []
+
+    @property
+    def mirror_rings( self ) :
+        if self.isEdge :
+            if not hasattr( self , "__mirror_rings" ) :
+                if self.mirror != None :
+                    self.__mirror_rings = [ t for t , s in [ (self.__qmesh.find_mirror(e,False) , e) for e in self.rings ] if t ]
+                else :
+                    self.__mirror_rings = []
+            return self.__mirror_rings
+        return []
+
+    @property
+    def both_rings( self ) :
+        mp = [ m for m in self.mirror_rings if m not in self.rings ]
+        if mp :
+            return self.rings + mp
+        return self.rings
+
+    @property
     def type_name(self)  :
         if isinstance( self.element , bmesh.types.BMVert ) :
             return 'VERT'
@@ -253,29 +325,31 @@ class ElementItem :
             alpha = preferences.highlight_face_alpha
             element = self.element
 
-            funcs.append( draw_util.drawElementHilight3DFunc( obj , element , size , width ,alpha, color ) )
+            funcs.append( draw_util.drawElementHilight3DFunc( obj , self.bm , element , size , width ,alpha, color ) )
             if self.isEdge :
-                if self.__div > 0 :
+                if edge_pivot and self.__div > 0 :
                     div_col = ( color[0] , color[1] , color[2] , color[3] * 0.5 )
                     l2w = self.__qmesh.local_to_world_pos
                     rs = [ (i+1.0) / (self.__div + 1.0) for i in range(self.__div) ]
                     div_points = [ l2w( element.verts[0].co.lerp( element.verts[1].co , r) ) for r in rs ]
                     def draw_div() :
-                        draw_util.draw_pivots3D( div_points , 0.75 , div_col )                
+                        draw_util.draw_pivots3D( div_points , preferences.highlight_line_width * 3 , div_col )                
                     funcs.append( draw_div )
                 if edge_pivot :
                     def draw_pivot() :
-                        draw_util.draw_pivots3D( (self.hitPosition,) , 1.0 , color )
+                        draw_util.draw_pivots3D( (self.hitPosition,) , preferences.highlight_line_width * 3 , (1,1,1,1) )
                     funcs.append( draw_pivot )
                 if marker and len(element.link_faces) <= 1 :
                     v0 = pqutil.location_3d_to_region_2d(  self.__qmesh.local_to_world_pos(element.verts[0].co) )
                     v1 = pqutil.location_3d_to_region_2d(  self.__qmesh.local_to_world_pos(element.verts[1].co) )                        
                     def draw_marker() :
-                        self.draw_extrude_marker( preferences.marker_size , v0 , v1 )
+                        self.draw_edge_extrude_marker( preferences.marker_size , v0 , v1 )
                     funcs.append( draw_marker )
+            elif self.isFace :
+                pass
             if self.mirror is not None and self.mirror.is_valid :
                 color = ( color[0] , color[1] ,color[2] ,color[3] * 0.5 )
-                funcs.append( draw_util.drawElementHilight3DFunc( obj , self.mirror , size , width ,alpha , color ) )
+                funcs.append( draw_util.drawElementHilight3DFunc( obj , self.bm , self.mirror , size , width ,alpha , color ) )
 
         def draw_all() :
             for func in funcs :
@@ -285,7 +359,24 @@ class ElementItem :
         return draw_all
 
 
-    def draw_extrude_marker( self , size , v0 , v1 ) :
+    def draw_face_center_marker_func( self , color , is_hit , is_normal ) :
+        center = self.element.calc_center_median()
+        pos = self.__qmesh.local_to_world_pos(center)
+        dist = self.__qmesh.preferences.distance_to_highlight * 0.5
+        if is_normal :   
+            p1 = self.__qmesh.local_to_world_pos( center )  
+            p2 = self.__qmesh.local_to_world_pos( center + self.element.normal * self.element.calc_perimeter() / len(self.element.edges) / 2 )  
+            def draw_face_marker():                
+                draw_util.draw_pivots3D( [pos] , dist if is_hit else dist * 0.7 , ( color[0] , color[1] , color[2] , 1 if is_hit else 0.5 ) )
+                draw_util.draw_lines3D( bpy.context , [ p1 , p2 ] , color )
+
+            return draw_face_marker
+        else :
+            def draw_face_marker():                
+                draw_util.draw_pivots3D( [pos] , dist if is_hit else dist * 0.7 , ( color[0] , color[1] , color[2] , 1 if is_hit else 0.5 ) )
+            return draw_face_marker
+
+    def draw_edge_extrude_marker( self , size , v0 , v1 ) :
         element = self.element    
         with draw_util.push_pop_projection2D() :
             p1 = pqutil.location_3d_to_region_2d( self.hitPosition )
@@ -295,7 +386,7 @@ class ElementItem :
             center = ((v0 + v1 ) / 2)
             vec = (v1 - v0 ).normalized()
             norm = (mathutils.Matrix.Rotation(math.radians(90.0), 2, 'Z') @ vec).normalized()
-            radius = min( [ length / 10 * size , dpm() * 4 * size ] )
+            radius = min( [ length / 10 * size , display.dot(2 * size) ] )
 
             tangents = []
             for face in element.link_faces :
@@ -307,7 +398,7 @@ class ElementItem :
 
             can_extrude = False
             if len( [ t for t in tangents if t.dot( norm ) > 0 ] ) <= 0 :
-                offset = center + norm * 2 * dpm()
+                offset = center + norm * display.dot(2)
                 if (p1 - center).length <= radius :
                     vs = [ offset + vec * radius , offset - vec * radius , offset + norm * radius ]
                     draw_util.draw_poly2D( vs , (1,1,1,1) )
@@ -317,7 +408,7 @@ class ElementItem :
                     can_extrude = True
 
             if len( [ t for t in tangents  if t.dot( norm ) < 0 ] ) <= 0 :
-                offset = center - norm * 2 * dpm()
+                offset = center - norm * display.dot(2)
                 if (p1 - center).length <= radius :
                     vs = [ offset + vec * radius , offset - vec * radius , offset - norm * radius ]
                     draw_util.draw_poly2D( vs , (1,1,1,1) )
@@ -342,8 +433,22 @@ class ElementItem :
             center = ((v0 + v1 ) / 2)
             vec = (v1 - v0 ).normalized()
             norm = (mathutils.Matrix.Rotation(math.radians(90.0), 2, 'Z') @ vec).normalized()
-            radius = min( [ length / 10 * size , dpm() * 5 * size ] )
+            radius = min( [ length / 10 * size , display.dot( 5 * size ) ] )
 
             return (p1 - center).length <= radius
         return False
 
+    def is_hit_center( self ) :
+        if self.isFace :
+            center = self.element.calc_center_median()
+            if bmesh.geometry.intersect_face_point( self.element , center ) :
+                pos = self.__qmesh.local_to_world_pos(center)
+                p0 = pqutil.location_3d_to_region_2d( pos )            
+                p1 = pqutil.location_3d_to_region_2d( self.hitPosition )            
+                dist = display.dot( self.__qmesh.preferences.distance_to_highlight )
+                return ( p0 - p1 ).length <= dist
+        return False
+
+
+
+    

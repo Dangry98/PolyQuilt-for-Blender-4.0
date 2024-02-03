@@ -30,7 +30,7 @@ class SubToolBrushRelax(SubToolEx) :
 
     def __init__(self, event ,  root) :
         super().__init__(root)
-        self.radius = self.preferences.brush_size * dpm()
+        self.radius = display.dot( self.preferences.brush_size )
         self.occlusion_tbl = {}
         self.mirror_tbl = {}
         self.dirty = False
@@ -45,13 +45,24 @@ class SubToolBrushRelax(SubToolEx) :
 
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
+        pos = gizmo.mouse_pos
+        preferences = gizmo.preferences
         def Draw() :
-            radius = gizmo.preferences.brush_size * dpm()
-            strength = gizmo.preferences.brush_strength  
-            with draw_util.push_pop_projection2D() :
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius * strength , color = (1,0.25,0.25,0.25), fill = False , subdivide = 64 , dpi= False )
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius , color = (1,1,1,0.5), fill = False , subdivide = 64 , dpi= False )
+            cls.Draw( preferences , pos )
         return Draw
+
+    @classmethod
+    def Draw( cls ,preferences , pos ) :
+        SubToolBrushRelax.DrawCircle( preferences , pos , (1,1,1,0.5), (1,0.25,0.25,0.25) )
+
+    @staticmethod
+    def DrawCircle( preferences , pos , color1 , color2 ) :
+        radius = display.dot( preferences.brush_size )
+        strength = preferences.brush_strength  
+        with draw_util.push_pop_projection2D() :
+            if color2[3] > 0.0 :
+                draw_util.draw_circle2D( pos , radius * strength , color = color2, fill = False , subdivide = 64 , dpi= False )
+            draw_util.draw_circle2D( pos , radius , color = color1, fill = False , subdivide = 64 , dpi= False )
 
     def OnUpdate( self , context , event ) :
         if event.type == 'MOUSEMOVE':
@@ -90,7 +101,7 @@ class SubToolBrushRelax(SubToolEx) :
 
         select_stack.push()
         select_stack.select_mode(True,False,False)
-        bpy.ops.view3d.select_circle( x = coord.x , y = coord.y , radius = radius , wait_for_input=False, mode='SET' )
+        bpy.ops.view3d.select_circle( x = int(coord.x) , y = int(coord.y) , radius = int(radius) , wait_for_input=False, mode='SET' )
 #        bm.select_flush(False)
 
         occlusion_tbl_get = self.occlusion_tbl.get
@@ -124,23 +135,7 @@ class SubToolBrushRelax(SubToolEx) :
 
         return { c[0]: [c[1],c[2]] for c in coords if c != None } 
 
-    def MirrorVert( self , context , coords ) :
-        # ミラー頂点を検出
-        find_mirror = self.bmo.find_mirror
-        mirrors = { vert : find_mirror( vert ) for vert , coord in coords.items() }
 
-        # 重複する場合は
-        for (vert , coord) , mirror in zip( coords.items() , mirrors.values() ) :
-            if mirror != None :
-                cur = coord[0]
-                dst = coords[mirror][0]
-                coord[0] = cur if dst <= cur else dst
-
-        # 重複しないものを列挙
-        mirrors = { vert : [coords[vert][0] , mirror.co.copy() ] for vert , mirror in mirrors.items() if mirror != None and mirror not in coords }
-
-        coords.update(mirrors)
-        return coords
 
     def DoRelax( self , context , coord ) :
         is_fix_zero = self.preferences.fix_to_x_zero or self.bmo.is_mirror_mode
@@ -200,12 +195,7 @@ class SubToolBrushRelax(SubToolEx) :
                     else :
                         mirror.co = mirror_pos(vert.co)
 
-#        self.bmo.bm.normal_update()
-#        self.bmo.obj.data.update_gpu_tag()
-#        self.bmo.obj.data.update_tag()
-#        self.bmo.obj.update_from_editmode()
-#        self.bmo.obj.update_tag()
-        bmesh.update_edit_mesh(self.bmo.obj.data , loop_triangles = False,destructive = False )
+        self.bmo.UpdateMesh(changeTopology = True , loop_triangles = False ,destructive = False )
 
     @classmethod
     def GetCursor(cls) :

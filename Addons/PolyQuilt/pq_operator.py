@@ -30,10 +30,12 @@ from .pq_icon import *
 from .subtools import *
 from .QMesh import *
 from .gizmo_preselect import PQ_GizmoGroup_Base            
-
 import bpy.utils.previews
 
-__all__ = ['MESH_OT_poly_quilt', 'MESH_OT_poly_quilt_daemon' , 'MESH_OT_poly_quilt_brush_size']
+from _bpy import types as bpy_types
+StructRNA = bpy_types.bpy_struct
+
+__all__ = ['MESH_OT_poly_quilt', 'MESH_OT_poly_quilt_retopo' , 'MESH_OT_poly_quilt_daemon' ]
 
 if not __package__:
     __package__ = "poly_quilt"
@@ -69,7 +71,7 @@ def enum_override_brush_type_callback(scene, context):
                ('DELETE' , "Delete", "" , custom_icon("icon_brush_delete") , 3 ) )
         return items
 
-class MESH_OT_poly_quilt(bpy.types.Operator):
+class MESH_OT_poly_quilt_base(bpy.types.Operator):
     """Draw Polygons with the mouse"""
     bl_idname = "mesh.poly_quilt"
     bl_label = "PolyQuilt"
@@ -83,18 +85,21 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     tool_mode : bpy.props.EnumProperty(
         name="Tool Mode",
         description="Tool Mode",
+        options = {'HIDDEN'} ,
         items=enum_tool_callback,
     )
 
     geometry_type : bpy.props.EnumProperty(
         name="Geometry Type",
         description="Geometry Type.",
+        options = {'HIDDEN'} ,
         items=enum_geometry_type_callback 
     )
 
     plane_pivot : bpy.props.EnumProperty(
         name="Plane Pivot",
         description="Plane Pivot",
+        options = {'HIDDEN'} ,
         items=[('OBJ' , "Object Center", "" , "PIVOT_MEDIAN" , 0),
                ('3D' , "3D Cursor", "" , "PIVOT_CURSOR" , 1 ) ],
         default='OBJ',
@@ -103,12 +108,14 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     move_type : bpy.props.EnumProperty(
         name="Move Type",
         description="Move Type.",
+        options = {'HIDDEN'} ,
         items=enum_move_type_callback,
     )
 
     snap_mode : bpy.props.EnumProperty(
         name="Snap Mode",
         description="Snap Mode",
+        options = {'HIDDEN'} ,
         items=[('ON' , "On", "" ),
                ('OFF' , "Off", "" ) ,
                ('AUTO' , "Auto", "" ) ],
@@ -118,6 +125,7 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     loopcut_mode : bpy.props.EnumProperty(
         name="LoopCut Mode",
         description="LoopCut Mode",
+        options = {'HIDDEN'} ,
         items=[('EQUAL' , "Equal", "" ),
                ('EVEN' , "Even", "" ) ],
         default='EQUAL',
@@ -126,6 +134,7 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     extrude_mode : bpy.props.EnumProperty(
         name="Extrude Mode",
         description="Extrude Mode",
+        options = {'HIDDEN'} ,
         items=[('PARALLEL' , "Parallel", "" ),
                ('BEND' , "Bend", "" ) ,
                ('FLEXIBLE' , "Flex", "" ) ],
@@ -136,6 +145,7 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     brush_type : bpy.props.EnumProperty(
         name="Brush Type",
         description="Brush Type.",
+        options = {'HIDDEN'} ,
         items=enum_brush_type_callback,
     )
 
@@ -148,6 +158,21 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
 
     def __del__(self):
         MESH_OT_poly_quilt.handle_remove()
+
+    def execute(self, context):
+        if hasattr( self , 'redo_info' ) and self.redo_info :
+            return {self.redo_info[0]( context )}
+        return {'CANCELLED'}
+
+    def draw_prop(self, context):
+        if hasattr( self , 'redo_info' ) and self.redo_info :
+            layout = self.layout
+            col = layout.column()
+            properties = StructRNA.path_resolve(self, "properties")
+            l_rna = getattr(properties, "bl_rna", None)
+            for prop in self.redo_info[1] : 
+                if prop in l_rna.properties.keys() :
+                    col.prop(self.properties, prop , expand  = True)
 
     def modal(self, context, event):
         def Exit() :
@@ -174,13 +199,12 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
 
         if 'CANCELLED' in val or 'FINISHED' in val :
             Exit()
-#           self.preselect.test_select( context , mathutils.Vector((event.mouse_region_x, event.mouse_region_y)) )
         return val
 
     def update(self, context, event):
         if self.preferences.is_debug :
             t = time.time()
-                    
+
         if event.type == 'TIMER':
             if self.currentSubTool is None or not self.currentSubTool.check_animated(context) :
                 return {'PASS_THROUGH'}
@@ -196,6 +220,8 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
         self.bmo.CheckValid( context )
         ret = 'FINISHED'
 
+        self.mouse_pos = mathutils.Vector((event.mouse_region_x, event.mouse_region_y))                
+
         if event.type == 'ESC':
             if self.currentSubTool is not None :
                 self.currentSubTool.OnExit()     
@@ -204,6 +230,8 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
         if self.currentSubTool is not None :
             ret = self.currentSubTool.Update(context, event)
             context.window.cursor_set( self.currentSubTool.CurrentCursor() )
+            if hasattr( self , "report_message" ) :
+                self.report({self.report_message[0]}, self.report_message[1] )
 
         if self.preferences.is_debug :
             self.count = self.count + 1
@@ -250,7 +278,8 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
                 self.report({'WARNING'}, "Element data is invalid!" )
                 return {'CANCELLED'}
 
-            element = copy.copy(self.preselect.currentElement)
+            element = self.preselect.currentElement
+            self.currentTarget = element
 
             if element == None or ( element.isEmpty == False and element.is_valid == False ) :
                 self.report({'WARNING'}, "Invalid Data..." )
@@ -260,7 +289,10 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
             if self.bmo.obj != context.active_object or self.bmo.bm.is_valid is False :            
                 self.report({'WARNING'}, "BMesh Broken..." )
                 return {'CANCELLED'}
-
+            if not maintools[self.tool_mode].Check( None , element ) :
+                return {'CANCELLED'}
+            self.mouse_pos = mathutils.Vector((event.mouse_region_x, event.mouse_region_y))      
+            self.start_mouse_pos = self.mouse_pos          
             self.currentSubTool = maintools[self.tool_mode](self , element, event.type )
             self.currentSubTool.OnInit(context )
 #            self.currentSubTool.Update(context, event)
@@ -286,11 +318,10 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
     def cancel( self , context):
         MESH_OT_poly_quilt.handle_remove()
         self.RemoveTimerEvent(context)
-        gc.collect()
+#       gc.collect()
 
     @staticmethod
     def draw_callback_px(self , context , region_data):
-        draw_util.begin_draw()
         if self != None and context.region_data == region_data :
             if self.preferences.is_debug :
                 font_id = 0  # XXX, need to find out how best to get this.
@@ -305,14 +336,11 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
 
             if self.currentSubTool is not None :
                 self.currentSubTool.Draw2D(context)
-        draw_util.end_draw()
 
     @staticmethod
     def draw_callback_3d(self , context , region_data):
         if self.currentSubTool is not None :
-            draw_util.begin_draw()
             self.currentSubTool.Draw3D(context)
-            draw_util.end_draw()
 
     @staticmethod
     def handle_reset(self,context):
@@ -354,9 +382,42 @@ class MESH_OT_poly_quilt(bpy.types.Operator):
             return False
         return bpy.context.scene.tool_settings.use_snap
 
+class MESH_OT_poly_quilt(MESH_OT_poly_quilt_base):
+    """Draw Polygons with the mouse"""
+    bl_idname = "mesh.poly_quilt"
+    bl_label = "PolyQuilt"
+class MESH_OT_poly_quilt_retopo(MESH_OT_poly_quilt_base):
+    """Retopology with the mouse"""
+    bl_idname = "mesh.poly_quilt_retopo"
+    bl_label = "PolyQuilt::Retopo"
+
+    edge_divide : bpy.props.IntProperty(
+        name="Edge Divide",
+        description="Edge Divide",
+        default=0,
+        min=0,
+        max=64)
+
+    edge_slide : bpy.props.IntProperty(
+        name="Edge Slide",
+        description="Edge Slide",
+        default=0,
+        min=0,
+        max=64)
+
+    edge_offset : bpy.props.FloatProperty(
+        name="Edge Offset",
+        description="Edge Offset",
+        default=0,
+        min=-100,
+        max=100)
+
+    def draw(self, context):
+        self.draw_prop(context)
+
 class MESH_OT_poly_quilt_daemon(bpy.types.Operator):
     """Check Modifire"""
-    bl_idname = "mesh.poly_quilt_daemon"
+    bl_idname = "none.poly_quilt_daemon"
     bl_label = "PolyQuiltDaemon"
 
     is_running = False
@@ -377,9 +438,12 @@ class MESH_OT_poly_quilt_daemon(bpy.types.Operator):
             context.window.cursor_set( 'DEFAULT' )
             bpy.app.handlers.depsgraph_update_post.remove( MESH_OT_poly_quilt_daemon.depsgraph_update_post_handler )
             bpy.app.handlers.depsgraph_update_pre.remove( MESH_OT_poly_quilt_daemon.depsgraph_update_pre_handler )
+#           gc.collect()
             return {'CANCELLED'}
 
-        PQ_GizmoGroup_Base.recive_event( context, event )
+        if PQ_GizmoGroup_Base.recive_event( context, event ) :
+            context.area.tag_redraw()
+            return {'RUNNING_MODAL'}
         return {'PASS_THROUGH'}
 
     def invoke(self, context, event):
@@ -399,35 +463,3 @@ class MESH_OT_poly_quilt_daemon(bpy.types.Operator):
     @staticmethod
     def depsgraph_update_pre_handler( scene):
         PQ_GizmoGroup_Base.depsgraph_update_post( scene )
-
-class MESH_OT_poly_quilt_brush_size(bpy.types.Operator):
-    """Change Brush Size"""
-    bl_idname = "mesh.poly_quilt_brush_size"
-    bl_label = "PolyQuiltBrushSize"
-    
-    brush_size_value : bpy.props.FloatProperty(
-        name="Brush Size Value",
-        description="Brush Size Value",
-        default=0.0,
-        min=-1000.0,
-        max=1000.0)
-
-    brush_strong_value : bpy.props.FloatProperty(
-        name="Brush Strong Value",
-        description="Brush Strong Value",
-        default=0.0,
-        min=-1.0,
-        max=1.0)
-
-    def invoke(self, context, event):
-        if context.area.type == 'VIEW_3D' :
-            preferences = context.preferences.addons[__package__].preferences        
-
-            a = (preferences.brush_size * preferences.brush_size) / 40000.0 + 0.1
-            preferences.brush_size += self.brush_size_value * a       
-            strength = min( max( 0 , preferences.brush_strength + self.brush_strong_value ) , 1 )
-            preferences.brush_strength = strength
-            context.area.tag_redraw()
-
-        return {'CANCELLED'}
-

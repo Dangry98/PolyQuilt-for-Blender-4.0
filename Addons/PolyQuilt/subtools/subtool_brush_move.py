@@ -24,13 +24,15 @@ from ..utils import draw_util
 from ..QMesh import *
 from .subtool import SubToolEx
 from ..utils.dpi import *
+from .subtool_brush_relax import *
 
 class SubToolBrushMove(SubToolEx) :
     name = "MoveBrushTool"
 
     def __init__(self, event ,  root ) :
         super().__init__( root )
-        self.radius = self.preferences.brush_size * dpm()
+        self.startMousePos = root.startMousePos
+        self.radius = display.dot( self.preferences.brush_size )
         self.strength = self.preferences.brush_strength
         self.mirror_tbl = {}
         matrix = self.bmo.obj.matrix_world        
@@ -61,20 +63,23 @@ class SubToolBrushMove(SubToolEx) :
 
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
+        pos = gizmo.mouse_pos
+        preferences = gizmo.preferences
         def Draw() :
-            radius = gizmo.preferences.brush_size * dpm()
-            strength = gizmo.preferences.brush_strength  
-            with draw_util.push_pop_projection2D() :
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius * strength , color = (1,0.25,0.25,0.25), fill = False , subdivide = 64 , dpi= False )
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius , color = (1,1,1,0.5), fill = False , subdivide = 64 , dpi= False )
+            cls.Draw( preferences , pos )
         return Draw
 
+    @classmethod
+    def Draw( cls ,preferences , pos ) :
+        SubToolBrushRelax.DrawCircle( preferences , pos , preferences.split_color, preferences.split_color )        
+
     def OnDraw( self , context  ) :
-        radius = self.preferences.brush_size * dpm()
+        color = self.preferences.split_color
+        radius = display.dot( self.preferences.brush_size )
         strength = self.preferences.brush_strength  
 
-        draw_util.draw_circle2D( self.mouse_pos , radius * strength , color = (1,0.25,0.25,0.25), fill = False , subdivide = 64 , dpi= False )
-        draw_util.draw_circle2D( self.startMousePos , self.radius , color = (0.75,0.75,1,1), fill = False , subdivide = 64 , dpi= False , width = 1.0 )
+        draw_util.draw_circle2D( self.mouse_pos , radius * strength , color = color, fill = False , subdivide = 64 , dpi= False )
+        draw_util.draw_circle2D( self.startMousePos , self.radius , color = color, fill = False , subdivide = 64 , dpi= False , width = 1.0 )
 
     def OnDraw3D( self , context  ) :
         pass
@@ -94,7 +99,7 @@ class SubToolBrushMove(SubToolEx) :
 
         select_stack.push()
         select_stack.select_mode(True,False,False)
-        bpy.ops.view3d.select_circle( x = coord.x , y = coord.y , radius = radius , wait_for_input=False, mode='SET' )
+        bpy.ops.view3d.select_circle( x = int(coord.x) , y = int(coord.y) , radius = int(radius) , wait_for_input=False, mode='SET' )
 #        bm.select_flush(False)
 
         is_target = QSnap.is_target
@@ -141,7 +146,7 @@ class SubToolBrushMove(SubToolEx) :
             coord = p + move
             x = region_2d_to_location_3d( region = region , rv3d = rv3d , coord = coord , depth_location = co)
             x = co.lerp( x , 1 - r )
-            x = QSnap.adjust_point( x )
+            x , _ = QSnap.adjust_point( x )
             x = matrix_inv @ x
             if is_fix_zero and is_x_zero_pos(orig) :
                 x.x = 0 

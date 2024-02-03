@@ -19,8 +19,6 @@ from .utils import draw_util
 from .subtools import *
 from .pq_tool import *
 
-
-
 class PQ_Gizmo_Preselect( bpy.types.Gizmo):
     bl_idname = "MESH_GT_PQ_Preselect"
 
@@ -33,9 +31,8 @@ class PQ_Gizmo_Preselect( bpy.types.Gizmo):
         self.subtool = None
         self.tool_table = [None,None,None,None]
         self.tool = None
-
-    def __del__(self) :
-        pass
+        self.invalid = False
+        self.temp = bmesh.new()
 
     def setup(self):
         self.bmo = None        
@@ -52,9 +49,18 @@ class PQ_Gizmo_Preselect( bpy.types.Gizmo):
             context.window.cursor_set( self.subtool.GetCursor() )
 
     def exit( self , context, cancel) :
+        print("hoge")
         pass
 
+    @property
+    def operator( self ) :
+        return self.tool.pq_operator
+
     def test_select(self, context, location):
+        if self.invalid :
+            self.bmo.invalid = True
+            self.invalid = False
+
         if PQ_GizmoGroup_Base.running_polyquilt :
             self.DrawHighlight = None
             return -1
@@ -93,11 +99,15 @@ class PQ_Gizmo_Preselect( bpy.types.Gizmo):
             self.DrawHighlight = None
 
         if self.DrawHighlight != None :
-            self.DrawHighlight()
+            if type(self.DrawHighlight) == list :
+                for drawHighlight in self.DrawHighlight :
+                    drawHighlight()
+            else :
+                self.DrawHighlight()
 
     def refresh( self , context ) :
         if self.bmo != None :
-            self.bmo.invalid = True
+            self.invalid = True
             self.currentElement = ElementItem.Empty()
             self.DrawHighlight = None
 
@@ -118,17 +128,19 @@ class PQ_Gizmo_Preselect( bpy.types.Gizmo):
             PQ_GizmoGroup_Base.set_cursor( )
 
         if context.region_data == self.region and self.subtool:
-            self.subtool.recive_event( self , context , event )
+            return self.subtool.recive_event( self , context , event )
+        return False
 
     def get_keyitem( self , shift , ctrl , alt,  oskey ) :
         keymap = bpy.context.window_manager.keyconfigs.user.keymaps["3D View Tool: Edit Mesh, " + self.tool.bl_label]
-        keyitems = [ item for item in keymap.keymap_items if item.idname == 'mesh.poly_quilt' ]
         for item in keymap.keymap_items :
-            if item.idname == 'mesh.poly_quilt' and item.active :
+            if self.operator == item.idname and item.active :
                 if [ item.shift , item.ctrl , item.alt,  item.oskey ] == [ shift , ctrl , alt,  oskey ] :
-                    if item.active :
-                        return item
+                    return item
         return None
+
+    def invoke( self , context, event) :
+        pass
 
     def get_attr( self , attr ) :
         if self.keyitem :
@@ -136,8 +148,8 @@ class PQ_Gizmo_Preselect( bpy.types.Gizmo):
                 return getattr( self.keyitem.properties , attr )
 
         for tool in bpy.context.workspace.tools :
-            if "mesh_tool.poly_quilt" in tool.idname :
-                props = tool.operator_properties("mesh.poly_quilt")
+            if tool.idname is self.operator :
+                props = tool.operator_properties(self.operator)
                 return getattr( props , attr )
 
         return None
@@ -151,6 +163,7 @@ class PQ_GizmoGroup_Base(bpy.types.GizmoGroup):
     bl_space_type = 'VIEW_3D'
     bl_idname = my_tool.bl_widget
     child_gizmos = []
+
     cursor = 'DEFAULT'
 
     running_polyquilt = False
@@ -159,7 +172,7 @@ class PQ_GizmoGroup_Base(bpy.types.GizmoGroup):
         self.gizmo = None
 
     def __del__(self) :
-        if hasattr( self , "gizmo" ) :               
+        if hasattr( self , "gizmo" ) :       
             PQ_GizmoGroup_Base.child_gizmos.remove( self.gizmo )
         if not PQ_GizmoGroup_Base.child_gizmos :
             QSnap.remove_ref()
@@ -203,8 +216,10 @@ class PQ_GizmoGroup_Base(bpy.types.GizmoGroup):
 
     @classmethod
     def recive_event( cls , context , event ) :
+        ret = False
         for gizmo in cls.child_gizmos :
-            gizmo.recive_event( context , event)
+            ret = ret | gizmo.recive_event( context , event)
+        return ret
 
     @classmethod
     def depsgraph_update_post( cls , scene ) :
@@ -237,6 +252,11 @@ class PQ_GizmoGroup_Extrude(PQ_GizmoGroup_Base):
     bl_idname = my_tool.bl_widget
     bl_label = "PolyQuilt Extrude Gizmo"
 
+class PQ_GizmoGroup_EdgeLoop(PQ_GizmoGroup_Base):
+    my_tool = ToolPolyQuiltEdgeLoop
+    bl_idname = my_tool.bl_widget
+    bl_label = "PolyQuilt Edgeloop Gizmo"
+
 class PQ_GizmoGroup_LoopCut(PQ_GizmoGroup_Base):
     my_tool = ToolPolyQuiltLoopCut
     bl_idname = my_tool.bl_widget
@@ -252,9 +272,12 @@ class PQ_GizmoGroup_Seam(PQ_GizmoGroup_Base):
     bl_idname = my_tool.bl_widget
     bl_label = "PolyQuilt Seam Gizmo"
 
+class PQ_GizmoGroup_QuadPatch(PQ_GizmoGroup_Base):
+    my_tool = ToolPolyQuiltQuadPatch
+    bl_idname = my_tool.bl_widget
+    bl_label = "PolyQuilt QuadOatch Gizmo"
 
-all_gizmos = ( PQ_Gizmo_Preselect , PQ_GizmoGroup_Preselect , PQ_GizmoGroup_Lowpoly , PQ_GizmoGroup_Knife , PQ_GizmoGroup_Delete, PQ_GizmoGroup_Extrude, PQ_GizmoGroup_LoopCut, PQ_GizmoGroup_Brush, PQ_GizmoGroup_Seam )
+all_gizmos = ( PQ_Gizmo_Preselect , PQ_GizmoGroup_Preselect , PQ_GizmoGroup_Lowpoly , PQ_GizmoGroup_Knife , PQ_GizmoGroup_Delete, PQ_GizmoGroup_Extrude, PQ_GizmoGroup_EdgeLoop, PQ_GizmoGroup_LoopCut, PQ_GizmoGroup_Brush, PQ_GizmoGroup_Seam, PQ_GizmoGroup_QuadPatch )
 
 
-# ursor (enum in ['DEFAULT', 'NONE', 'WAIT', 'CROSSHAIR', 'MOVE_X', 'MOVE_Y', 'KNIFE', 'TEXT', 'PAINT_BRUSH', 'PAINT_CROSS', 'DOT', 'ERASER', 'HAND', 'SCROLL_X', 'SCROLL_Y', 'SCROLL_XY', 'EYEDROPPER'], (optional)) – cursor
 

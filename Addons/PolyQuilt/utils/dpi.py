@@ -13,11 +13,37 @@
 
 import bpy
 
-def dpi() :
-    return bpy.context.preferences.system.dpi 
+class display :
 
-def dpc() :
-    return dpi() / 2.54
+    @staticmethod
+    def inch() :
+        return bpy.context.preferences.system.dpi
 
-def dpm() :
-    return dpc() / 10
+    @staticmethod
+    def cm() :
+        return bpy.context.preferences.system.dpi / 2.54
+
+    @staticmethod
+    def mm() :
+        return bpy.context.preferences.system.dpi / 25.4
+
+    @staticmethod
+    def scale() :
+        return bpy.context.preferences.system.ui_scale
+
+    @staticmethod
+    def pixel_size() :
+        return bpy.context.preferences.system.pixel_size
+
+    @staticmethod
+    def scale( val ) :
+        return bpy.context.preferences.system.dpi / 25.4 / bpy.context.preferences.system.ui_scale * bpy.context.preferences.system.pixel_size * val
+
+    @staticmethod
+    def dot( val ) :
+        return bpy.context.preferences.system.dpi / 25.4 * bpy.context.preferences.system.pixel_size * val
+
+    def dot_to_mm( val ) :
+        return val / (bpy.context.preferences.system.dpi / 25.4 * bpy.context.preferences.system.pixel_size)
+
+        

@@ -24,21 +24,13 @@ from ..utils.dpi import *
 from ..QMesh import *
 from ..utils.mouse_event_util import ButtonEventUtil, MBEventType
 from .subtool import *
-from .subtool_makepoly import *
-from .subtool_knife import *
-from .subtool_edge_slice import *
-from .subtool_edgeloop_cut import *
-from .subtool_edge_extrude import *
 from .subtool_brush_relax import *
 from .subtool_brush_size import *
 from .subtool_brush_move import *
 from .subtool_brush_delete import *
 from .subtool_move import *
-from .subtool_fin_slice import *
 from .subtool_autoquad import *
 from ..utils.dpi import *
-
-
 
 
 class MainToolBrush(MainTool) :
@@ -53,17 +45,16 @@ class MainToolBrush(MainTool) :
         }
 
         brush = op.brush_type
-        brush_type = brush_tbl[ brush ]
+        self.brush_type = brush_tbl[ brush ]
 
         self.callback = { 
             MBEventType.Release         : [] ,
             MBEventType.Click           : [SubToolAutoQuad] ,
             MBEventType.LongClick       : [] ,
             MBEventType.LongPressDrag   : [SubToolBrushSize] ,
-            MBEventType.Drag            : [brush_type] ,
+            MBEventType.Drag            : [self.brush_type] ,
         }
 
-    @staticmethod
     def LMBEventCallback(self , event ):
         self.debugStr = str(event.type)
         if event.type in self.callback.keys() :
@@ -75,18 +66,29 @@ class MainToolBrush(MainTool) :
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
         if SubToolAutoQuad.Check( None , element ) :
-            drawAutoQuad = SubToolAutoQuad.DrawHighlight(gizmo,element)
+            Draw = [SubToolAutoQuad.DrawHighlight(gizmo,element)]
         else :
-            drawAutoQuad = None
+            Draw = []
 
-        def Draw() :
-            radius = gizmo.preferences.brush_size * dpm()
-            strength = gizmo.preferences.brush_strength  
-            if drawAutoQuad :
-                drawAutoQuad()
-            with draw_util.push_pop_projection2D() :
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius * strength , color = (1,0.25,0.25,0.25), fill = False , subdivide = 64 , dpi= False )
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius , color = (1,1,1,0.5), fill = False , subdivide = 64 , dpi= False )
+        radius = display.dot( gizmo.preferences.brush_size )
+        strength = gizmo.preferences.brush_strength
+        mode = gizmo.keyitem.properties.brush_type
+
+        if gizmo.keyitem.properties.is_property_set("brush_type") :
+            mode = gizmo.keyitem.properties.brush_type
+        else :
+            from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+            tool = ToolSelectPanelHelper.tool_active_from_context(bpy.context)
+            props = tool.operator_properties( gizmo.tool.pq_operator )            
+            mode =props.brush_type
+
+        if mode == 'MOVE' :
+            Draw.append( SubToolBrushMove.DrawHighlight( gizmo , element ) )
+        elif mode == 'DELETE' :
+            Draw.append( SubToolBrushDelete.DrawHighlight( gizmo , element ) )
+        else :
+            Draw.append( SubToolBrushRelax.DrawHighlight( gizmo , element ) )
+
         return Draw
 
     @classmethod
@@ -94,16 +96,13 @@ class MainToolBrush(MainTool) :
         return True
 
     def OnDraw( self , context  ) :
-        radius = self.preferences.brush_size * dpm()
-        strength = self.preferences.brush_strength          
-        draw_util.draw_circle2D( self.mouse_pos , radius * strength , color = (1,0.25,0.25,0.25), fill = False , subdivide = 64 , dpi= False )
-        draw_util.draw_circle2D( self.mouse_pos , radius , color = (1,1,1,0.5), fill = False , subdivide = 64 , dpi= False )        
+        self.brush_type.Draw( self.preferences , self.mouse_pos )
 
         self.LMBEvent.Draw( self.mouse_pos )
 
         if self.LMBEvent.is_hold :
             draw_util.DrawFont( "Strenght = " + '{:.0f}'.format(self.preferences.brush_strength * 100) , 10 , self.mouse_pos , (0,0) )
-            draw_util.DrawFont( "Radius = " + '{:.0f}'.format(self.preferences.brush_size * dpm() ) , 10 , self.mouse_pos , (0,-8) )
+            draw_util.DrawFont( "Radius = " + '{:.0f}'.format( display.dot(self.preferences.brush_size ) ) , 10 , self.mouse_pos , (0,-8) )
 
     def OnDraw3D( self , context  ) :
         if not self.LMBEvent.presureComplite :        
@@ -121,11 +120,13 @@ class MainToolBrush(MainTool) :
         if any( [ event.shift , event.ctrl , event.alt,  event.oskey ] ) :
             if event.type == 'WHEELUPMOUSE' :
                 cls.change_brush_size( gizmo.preferences , context ,-50 , 0 )
+                return True
 
             if event.type == 'WHEELDOWNMOUSE' :
                 cls.change_brush_size( gizmo.preferences , context , 50 , 0 )
+                return True
 
-        return {'PASS_THROUGH'}
+        return False
 
     @classmethod
     def change_brush_size( cls , preferences , context , brush_size_value , brush_strong_value ):
@@ -135,63 +136,3 @@ class MainToolBrush(MainTool) :
             strength = min( max( 0 , preferences.brush_strength + brush_strong_value ) , 1 )
             preferences.brush_strength = strength
             context.area.tag_redraw()
-
-class MainToolBrushDelete(MainToolBrush) :
-    name = "BrushDeleteSubTool"
-
-    def __init__(self,op,currentTarget, button) :
-        super().__init__(op,currentTarget, button)        
-        self.callback = { 
-            MBEventType.Release         : [] ,
-            MBEventType.Click           : [] ,
-            MBEventType.LongClick       : [] ,
-            MBEventType.LongPressDrag   : [SubToolBrushSize] ,
-            MBEventType.Drag            : [SubToolBrushDelete] ,
-        }
-
-    def OnDraw3D( self , context  ) :
-        pass
-
-    @classmethod
-    def DrawHighlight( cls , gizmo , element ) :
-        return SubToolBrushDelete.DrawHighlight(gizmo,element)
-
-class MainToolBrushRelax(MainToolBrush) :
-    name = "BrushRelaxSubTool"
-
-    def __init__(self,op,currentTarget, button) :
-        super().__init__(op,currentTarget, button)        
-        self.callback = { 
-            MBEventType.Release         : [] ,
-            MBEventType.Click           : [] ,
-            MBEventType.LongClick       : [] ,
-            MBEventType.LongPressDrag   : [SubToolBrushSize] ,
-            MBEventType.Drag            : [SubToolBrushRelax] ,
-        }
-
-    def OnDraw3D( self , context  ) :
-        pass
-
-    @classmethod
-    def DrawHighlight( cls , gizmo , element ) :
-        return SubToolBrushRelax.DrawHighlight(gizmo,element)
-
-class MainToolBrushMove(MainToolBrush) :
-    name = "BrushMoveSubTool"
-
-    def __init__(self,op,currentTarget, button) :
-        super().__init__(op,currentTarget, button)        
-        self.callback = { 
-            MBEventType.Release         : [] ,
-            MBEventType.Click           : [] ,
-            MBEventType.LongClick       : [] ,
-            MBEventType.LongPressDrag   : [SubToolBrushSize] ,
-            MBEventType.Drag            : [SubToolBrushMove] ,
-        }
-
-    def OnDraw3D( self , context  ) :
-        pass
-
-    @classmethod
-    def DrawHighlight( cls , gizmo , element ) :
-        return SubToolBrushMove.DrawHighlight(gizmo,element)

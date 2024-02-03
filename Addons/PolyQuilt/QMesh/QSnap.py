@@ -43,7 +43,13 @@ class QSnap :
 
     @classmethod
     def is_active( cls ) :
-        return cls.instance != None
+        if cls.instance == None :
+            return False
+
+        if cls.instance.bvh_list == None :
+            return False
+
+        return True
 
     @classmethod
     def update(cls,context) :
@@ -101,13 +107,43 @@ class QSnap :
         return world_pos
 
     @classmethod
+    def screen_adjust( cls , coord : mathutils.Vector ) -> mathutils.Vector :
+        if cls.instance != None :
+            ray = pqutil.Ray.from_screen( bpy.context , coord )
+            if ray == None :
+                return None
+            location , norm , obj = cls.instance.__raycast( ray )
+            if location != None :
+                return location
+        return None
+
+
+    @classmethod
     def adjust_point( cls , world_pos : mathutils.Vector , is_fix_to_x_zero = False) :
         if cls.instance != None :
             location , norm , index = cls.instance.__find_nearest( world_pos )
             if is_fix_to_x_zero and QMeshOperators.is_x_zero_pos(location) :
                 location.x = 0
-            return location
-        return world_pos
+                norm.x = 0
+                norm.normalize()
+            return location , norm
+        return world_pos , mathutils.Vector( (0,0,1) )
+
+    @classmethod
+    def adjust_by_normal( cls , world_pos : mathutils.Vector , world_normal : mathutils.Vector  , is_fix_to_x_zero = False ) :
+        if cls.instance != None :
+            ray = pqutil.Ray( world_pos , world_normal )
+            location , norm , index = cls.instance.__raycast_double( ray )
+            if location == None :
+                location , norm , index = cls.instance.__find_nearest( world_pos )
+            if location != None :
+                if is_fix_to_x_zero and QMeshOperators.is_x_zero_pos(location) :
+                    location.x = 0
+                    norm.x = 0
+                    norm.normalize()                    
+                return location , norm
+        return world_pos , world_normal
+
 
     @classmethod
     def adjust_local( cls , matrix_world : mathutils.Matrix , local_pos : mathutils.Vector , is_fix_to_x_zero ) :
@@ -191,25 +227,18 @@ class QSnap :
 
         return location , normal , index
 
-    def __smart_find( self , ray : pqutil.Ray ) :
-        location_i , normal_i , obj_i = self.__raycast_double( ray )
-        if location_i == None :
-            a,b,c = self.__find_nearest( ray.origin )
-            return a,b,c
-        location_r , normal_r , obj_r = self.__find_nearest( ray.origin )
-        if location_r == None :
-            return location_i , normal_i , obj_i
-        if (location_r - ray.origin).length <= (location_i - ray.origin).length :
-            return location_r , normal_r , obj_r
-        else :
-            return location_i , normal_i , obj_i        
-
     def __raycast_double( self , ray : pqutil.Ray ) :
         # ターゲットからビュー方向にレイを飛ばす
-        location_r , normal_r , face_r = self.__raycast( ray )
-        location_i , normal_i , face_i = self.__raycast( ray.invert )
+        location_r , normal_r , face_r = self.__raycast( ray.invert )
 
-        if None in [face_i,face_r] :
+#        if face_r != None :
+#            print(ray.vector.dot( normal_r ))
+#            if ray.vector.dot( normal_r ) < -0.5 :
+#                return location_r , normal_r , face_r
+
+        location_i , normal_i , face_i = self.__raycast( ray )
+
+        if face_i == None or face_r == None :
             if face_i != None :
                 return location_i , normal_i , face_i
             elif face_r != None :

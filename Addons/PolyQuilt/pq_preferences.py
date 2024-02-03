@@ -66,10 +66,8 @@ class PQ_OT_UpdateAddon(bpy.types.Operator):
     def execute(self, _):
         updater = AddonUpdaterManager.get_instance()
         updater.update(self.branch_name)
-
+        #bpy.ops.script.reload
         return {'FINISHED'}
-
-
 
 
 def register_updater(bl_info):
@@ -157,22 +155,22 @@ class PolyQuiltPreferences(AddonPreferences):
     distance_to_highlight : FloatProperty(
         name="distance_to_highlight",
         description="distance_to_highlight",
-        default=4.0,
+        default=2.5,
         min=1.0,
         max=10.0)
 
     highlight_vertex_size : FloatProperty(
         name="Highlight Vertex Size",
         description="Highlight Vertex Size",
-        default= 1.25,
+        default= 3,
         min=0.5,
         max=8.0)
 
     highlight_line_width : FloatProperty(
         name="Highlight Line Width",
         description="Highlight Line Width",
-        default=2.0,
-        min=1.0,
+        default=1.0,
+        min=0.1,
         max=10.0)
 
     highlight_face_alpha : FloatProperty(
@@ -238,6 +236,13 @@ class PolyQuiltPreferences(AddonPreferences):
         min=0.0,
         max=1.0)    
 
+    line_segment_length : bpy.props.FloatProperty(
+        name="Line segment length",
+        description="Line segment length",
+        default=0.1,
+        min=0.01,
+        max=5.0)    
+
     fix_to_x_zero : bpy.props.BoolProperty(
               name = "fix_to_x_zero" ,
               default = False ,
@@ -260,7 +265,7 @@ class PolyQuiltPreferences(AddonPreferences):
     vertex_dissolve_angle : FloatProperty(
         name="Vertex Dessolve Angle",
         description="Vertex Dessolve Angle",
-        default= 160,
+        default= 120,
         min=0,
         max=180)
 
@@ -331,7 +336,7 @@ class PolyQuiltPreferences(AddonPreferences):
             col.row().prop(self, "keymap_category", expand=True)
 
             keyconfing = context.window_manager.keyconfigs.user            
-            draw_tool_keymap( col.box() ,keyconfing , "3D View Tool: Edit Mesh, " + self.keymap_category )
+            draw_tool_keymap( 'mesh.poly_quilt' , col.box() ,keyconfing , "3D View Tool: Edit Mesh, " + self.keymap_category )
 
         layout.prop( self, "extra_setting_expanded", text="Extra Settings",
             icon='TRIA_DOWN' if self.extra_setting_expanded

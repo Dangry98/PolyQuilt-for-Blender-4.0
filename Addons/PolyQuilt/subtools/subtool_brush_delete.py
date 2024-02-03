@@ -24,13 +24,14 @@ from ..utils import draw_util
 from ..QMesh import *
 from .subtool import SubToolEx
 from ..utils.dpi import *
+from .subtool_brush_relax import *
 
 class SubToolBrushDelete(SubToolEx) :
     name = "DeleteBrushTool"
 
     def __init__(self, event ,  root ) :
         super().__init__( root )
-        self.radius = self.preferences.brush_size * dpm()
+        self.radius = display.dot( self.preferences.brush_size )
         self.strength = self.preferences.brush_strength
         self.mirror_tbl = {}
         matrix = self.bmo.obj.matrix_world        
@@ -46,14 +47,15 @@ class SubToolBrushDelete(SubToolEx) :
 
     @classmethod
     def DrawHighlight( cls , gizmo , element ) :
+        pos = gizmo.mouse_pos
+        preferences = gizmo.preferences
         def Draw() :
-            radius = gizmo.preferences.brush_size * dpm()
-            strength = gizmo.preferences.brush_strength  
-            color = gizmo.preferences.delete_color
-            with draw_util.push_pop_projection2D() :
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius * strength , color = color, fill = False , subdivide = 64 , dpi= False )
-                draw_util.draw_circle2D( gizmo.mouse_pos , radius , color = color, fill = False , subdivide = 64 , dpi= False )
+            cls.Draw( preferences , pos )
         return Draw
+
+    @classmethod
+    def Draw( cls ,preferences , pos ) :
+        SubToolBrushRelax.DrawCircle( preferences , pos , preferences.delete_color, preferences.delete_color )        
 
     def OnUpdate( self , context , event ) :
         if event.type == 'MOUSEMOVE':
@@ -85,7 +87,7 @@ class SubToolBrushDelete(SubToolEx) :
         vertex_size = self.preferences.highlight_vertex_size        
         width = self.preferences.highlight_line_width        
         color = self.preferences.delete_color 
-        draw_util.drawElementsHilight3D( self.bmo.obj , self.remove_faces , vertex_size , width , alpha , color )
+        draw_util.drawElementsHilight3D( self.bmo.obj  , self.bmo.bm, self.remove_faces , vertex_size , width , alpha , color )
 
     def collect_faces( self , context , coord ) :
         radius = self.radius
@@ -94,7 +96,7 @@ class SubToolBrushDelete(SubToolEx) :
         select_stack = SelectStack( context , bm )
         select_stack.push()
         select_stack.select_mode(False,False,True)
-        bpy.ops.view3d.select_circle( x = coord.x , y = coord.y , radius = radius , wait_for_input=False, mode='SET' )
+        bpy.ops.view3d.select_circle( x = int(coord.x) , y = int(coord.y) , radius = int(radius) , wait_for_input=False, mode='SET' )
         faces = { f for f in self.bmo.bm.faces if f.select }
         select_stack.pop()
         return faces

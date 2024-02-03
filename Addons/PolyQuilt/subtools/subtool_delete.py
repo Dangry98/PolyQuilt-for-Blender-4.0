@@ -45,10 +45,10 @@ class SubToolDelete(SubToolEx) :
             if self.currentTarget.isNotEmpty :
                 vt = None
                 if self.startTarget.isEdge :
-                    vt = self.bmo.highlight.check_hit_element_vert( self.startTarget.element , self.mouse_pos , self.preferences.distance_to_highlight * dpm())
+                    vt = self.bmo.highlight.check_hit_element_vert( self.startTarget.element , self.mouse_pos , self.preferences.distance_to_highlight )
                 ed = None
                 if self.startTarget.isFace :
-                    ed = self.bmo.highlight.check_hit_element_edge( self.startTarget.element , self.mouse_pos , self.preferences.distance_to_highlight * dpm())
+                    ed = self.bmo.highlight.check_hit_element_edge( self.startTarget.element , self.mouse_pos , self.preferences.distance_to_highlight )
                 if vt :
                     e , v = self.bmo.calc_edge_loop( self.startTarget.element )
                     self.removes = (e,v)
@@ -85,12 +85,12 @@ class SubToolDelete(SubToolEx) :
             vertex_size = self.preferences.highlight_vertex_size        
             width = self.preferences.highlight_line_width        
             color = self.preferences.delete_color 
-            draw_util.drawElementsHilight3D( self.bmo.obj , self.removes[0] , vertex_size , width , alpha , color )
+            draw_util.drawElementsHilight3D( self.bmo.obj  , self.bmo.bm, self.removes[0] , vertex_size , width , alpha , color )
             if self.bmo.is_mirror_mode :
                 mirrors = [ self.bmo.find_mirror(m) for m in self.removes[0] ]
                 mirrors = [ m for m in mirrors if m ]
                 if mirrors :
-                    draw_util.drawElementsHilight3D( self.bmo.obj , mirrors , vertex_size , width , alpha * 0.5 , color )
+                    draw_util.drawElementsHilight3D( self.bmo.obj , self.bmo.bm , mirrors , vertex_size , width , alpha * 0.5 , color )
 
         if self.startTarget.element == self.currentTarget.element :
             self.startTarget.Draw( self.bmo.obj , self.preferences.delete_color  , self.preferences , marker = False , edge_pivot = True )
@@ -105,33 +105,17 @@ class SubToolDelete(SubToolEx) :
         return 'ERASER'
 
     def RemoveElement( self , element ) :
-        def dissolve_edges( edges ) :
-            single_edges = [ e for e in edges if len(e.link_faces) == 0 ]
-            edges =  [ e for e in edges if len(e.link_faces) > 0 ]
-
-            if single_edges :
-                self.bmo.delete_edges( list(single_edges) )
-
-            if all( e.is_boundary for e in edges ) :
-                faces = set()
-                for e in edges :
-                    for f in e.link_faces :
-                        faces.add(f)
-                self.bmo.delete_faces( list(faces) )
-            else :
-                self.bmo.dissolve_edges( edges , use_verts = False , use_face_split = False , dissolve_vert_angle=self.preferences.vertex_dissolve_angle )
-
         if element.isNotEmpty :
             if self.removes[0] and self.removes[1] :
-                self.bmo.do_edge_loop_cut( self.removes[0] , self.removes[1] )
+                self.bmo.dissolve_edges( self.removes[0] , use_verts = False , use_face_split = False , dissolve_vert_angle=self.preferences.vertex_dissolve_angle )
             elif element.isVert :
                 edges = [ r for r in self.removes[0] if isinstance( r , bmesh.types.BMEdge )  ]
                 if edges :
-                    dissolve_edges( edges )
+                    self.bmo.dissolve_edges( edges , use_verts = False , use_face_split = False , dissolve_vert_angle=self.preferences.vertex_dissolve_angle )
                 else :
                     self.bmo.dissolve_vert( element.element , False , False , dissolve_vert_angle=self.preferences.vertex_dissolve_angle  )
             elif element.isEdge :
-                dissolve_edges( self.removes[0] )
+                    self.bmo.dissolve_edges( self.removes[0] , use_verts = False , use_face_split = False , dissolve_vert_angle=self.preferences.vertex_dissolve_angle )
             elif element.isFace :
                 self.bmo.delete_faces( self.removes[0] )                    
             self.bmo.UpdateMesh()
