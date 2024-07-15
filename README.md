@@ -1,4 +1,6 @@
-[Click here](https://github.com/Dangry98/PolyQuilt-for-Blender-4.0/releases/download/v.1.5.2/PolyQuilt.zip) to download the latest version.  
+Note - This is outdated, for Blender 4.2 and higher its aviable on the Blender Extension Platform: https://extensions.blender.org/add-ons/polyquilt-fork
+
+[Click here](https://github.com/Dangry98/PolyQuilt-for-Blender-4.0/releases/download/v.1.5.2/PolyQuilt.zip) to download versions for Blender 4.1 and down. 
 
 
 # PolyQuilt(ポリキルト)
