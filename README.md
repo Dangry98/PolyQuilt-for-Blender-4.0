@@ -1,5 +1,5 @@
-I am currently working on an English document. [Click here](https://github.com/sakana3/PolyQuilt/releases/download/1.3.1/PolyQuilt_v1.3.1.zip) to download the latest version.  
-If you are using Blender2.82 and earlier. [Click here](#OldVersion)
+[Click here](https://github.com/Dangry98/PolyQuilt-for-Blender-4.0/releases/download/v.1.5.2/PolyQuilt.zip) to download the latest version.  
+
 
 # PolyQuilt(ポリキルト)
 ---
