@@ -48,12 +48,13 @@ class SubToolAutoQuad(SubToolEx) :
                 self.bmo.UpdateMesh()
                 return vt
 
-        if verts != None :
-            vs = [ makeVert(v) for v in verts ]
+        if verts is not None:
+            vs = [makeVert(v) for v in verts]
             vs = sorted(set(vs), key=vs.index)
-            face = self.bmo.AddFace( vs , normal )
-            face.select_set(True)
-            self.bmo.UpdateMesh()
+            face = self.bmo.AddFace(vs, normal)
+            if face is not None:
+                face.select_set(True)
+                self.bmo.UpdateMesh()
 
     @staticmethod
     def Check( root , target ) :
@@ -156,24 +157,24 @@ class SubToolAutoQuad(SubToolEx) :
 
 
     @classmethod
-    def FindBoundaryEdge( cls , edge , vert , is_x_zero ) :
-        if is_x_zero and cls.is_x_zero( vert.co ) :
+    def FindBoundaryEdge(cls, edge, vert, is_x_zero):
+        if is_x_zero and cls.is_x_zero(vert.co):
             return None
 
-        manifolds = [ e for e in vert.link_edges if not e.link_faces and e != edge ]
-        if len(manifolds) == 1 :
-            nrm0 = ( vert.co - edge.other_vert(vert).co ).normalized()
-            nrm1 = ( vert.co - manifolds[0].other_vert(vert).co ).normalized()
-            if nrm0.angle( nrm1 ) * 57.3 < 150 :
-                if cls.CalaTangent(edge,vert).dot(nrm1) < 0 :
+        manifolds = [e for e in vert.link_edges if not e.link_faces and e != edge]
+        if len(manifolds) == 1:
+            nrm0 = (vert.co - edge.other_vert(vert).co).normalized()
+            nrm1 = (vert.co - manifolds[0].other_vert(vert).co).normalized()
+            if nrm0.length > 0 and nrm1.length > 0 and nrm0.angle(nrm1) * 57.3 < 150:
+                if cls.CalaTangent(edge, vert).dot(nrm1) < 0:
                     return manifolds[0]
 
-        boundary_edge = [ e for e in vert.link_edges if e.is_boundary and e != edge and edge.link_faces[0] not in e.link_faces ]
-        if len( boundary_edge ) == 1 :
-            nrm0 = ( vert.co - edge.other_vert(vert).co ).normalized()
-            nrm1 = ( vert.co - boundary_edge[0].other_vert(vert).co ).normalized()
-            if nrm0.angle( nrm1 ) * 57.3 < 150 :
-                if cls.CalaTangent(edge,vert).dot(nrm1) < 0 :
+        boundary_edge = [e for e in vert.link_edges if e.is_boundary and e != edge and edge.link_faces[0] not in e.link_faces]
+        if len(boundary_edge) == 1:
+            nrm0 = (vert.co - edge.other_vert(vert).co).normalized()
+            nrm1 = (vert.co - boundary_edge[0].other_vert(vert).co).normalized()
+            if nrm0.length > 0 and nrm1.length > 0 and nrm0.angle(nrm1) * 57.3 < 150:
+                if cls.CalaTangent(edge, vert).dot(nrm1) < 0:
                     return boundary_edge[0]
         return None
 

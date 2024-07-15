@@ -105,6 +105,7 @@ def draw_points2D( poss , radius , color = (1,1,1,1) ):
     shader2D.uniform_float("color", color )
     batch_draw(shader2D, 'POINTS', {"pos": poss} )
 
+
 def draw_lines2D(verts, color=(1, 1, 1, 1), width: float = 1.0):
     region = bpy.context.region
     shader = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
@@ -116,21 +117,17 @@ def draw_lines2D(verts, color=(1, 1, 1, 1), width: float = 1.0):
     gpu.state.blend_set("ALPHA")
     batch_for_shader(shader, 'LINE_STRIP', {"pos": verts}).draw(shader)
 
-def draw_dot_lines2D( verts , color = (1,1,1,1) , width : float = 2.0 , pattern = (4,2) ):
-    shaderEx.bind()
-    shaderEx.uniform_float("color", color )
-#   shaderEx.uniform_float("ModelViewProjectionMatrix", bpy.context.region_data.perspective_matrix)
-    shaderEx.uniform_float("line_t", ( display.dot( pattern[0] ) , display.dot(  pattern[1] )) )
+def draw_dot_lines2D(verts , color = (1,1,1,0.5) , width : float = 2.0 , pattern = (4,2), primitiveType='LINE_STRIP'):
+    region = bpy.context.region
+    shader = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+    batch = batch_for_shader(shader, primitiveType, {"pos": verts})
+ 
+    shader.uniform_float("viewportSize", (region.width, region.height))
+    shader.uniform_float("lineWidth", width)
 
-    dist = [0,]
-    length = 0
-    for i in range( len(verts) - 1 ) :
-        v1 = verts[i]
-        v2 = verts[i+1]
-        length += (v1-v2).length
-        dist.append( length )
-
-    batch_draw(shaderEx, 'LINE_STRIP', {"pos": verts, "dist": dist} )
+    shader.uniform_float("color", color)
+    gpu.state.blend_set("ALPHA")
+    batch.draw(shader)
 
 def draw_poly2D(verts, color=(1, 1, 1, 1)):
     shader2D.bind()

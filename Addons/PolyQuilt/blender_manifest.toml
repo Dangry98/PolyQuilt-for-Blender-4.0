@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "PolyQuilt_Fork"
+version = "1.45.4"
+name = "PolyQuilt Retopology Tool [Fork]"
+tagline = "Retopology Tool for Blender" 
+maintainer = "Sakana3, Dan-Gry"
+type = "add-on"
+
+website = "https://github.com/Dangry98/PolyQuilt-for-Blender-4.0"
+
+tags = ["Modeling"]
+
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+

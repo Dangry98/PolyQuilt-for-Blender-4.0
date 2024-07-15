@@ -30,7 +30,7 @@ class ToolPolyQuiltBase(WorkSpaceTool):
     bl_widget = "MESH_GGT_PQ_Preselect"
 
     @classmethod
-    def tool_keymaps( cls , main_tools , operator = pq_operator , shift = ["NONE"] , ctrl = ["NONE"] , alt = ["NONE"] ) :
+    def tool_keymaps( cls , main_tools , operator = pq_operator , shift = ["NONE"] , ctrl = ["NONE"] , alt = ["NONE"], ctrl_shift = ["NONE"] ) :
         def keyitem( mods , tool ) :
             key = {"type": 'LEFTMOUSE', "value": 'PRESS', "shift" : 's' in mods  , "ctrl" : 'c' in mods , "alt" : 'a' in mods , "oskey": 'o' in mods }
             prop = {"properties": [("tool_mode", tool[0] )]}
@@ -44,7 +44,7 @@ class ToolPolyQuiltBase(WorkSpaceTool):
             keyitem( "s" , shift ) ,  
             keyitem( "c" , ctrl ) ,  
             keyitem( "a" , alt ) ,  
-            keyitem( "cs" , ['NONE'] ) ,  
+            keyitem( "cs" , ctrl_shift ) ,
             keyitem( "sa" , ['NONE'] ) ,  
             keyitem( "ca" , ['NONE'] ) ,  
             keyitem( "os" , ['NONE'] ) ,  
@@ -82,7 +82,7 @@ class ToolPolyQuilt(ToolPolyQuiltBase):
     bl_description = ( "Lowpoly Tool" )
     bl_icon = os.path.join(os.path.join(os.path.dirname(__file__), "icons") , "addon.poly_quilt_icon")
     bl_widget = "MESH_GGT_PQ_Preselect"
-    bl_keymap = ToolPolyQuiltBase.tool_keymaps( [pq_main_tool] , shift = ['BRUSH'] )
+    bl_keymap = ToolPolyQuiltBase.tool_keymaps( [pq_main_tool] , shift = ['BRUSH'], ctrl = ['LOOPCUT'], ctrl_shift=['DELETE'] )
 
 class ToolPolyQuiltPoly(ToolPolyQuiltBase):
     pq_main_tool = 'LOWPOLY'

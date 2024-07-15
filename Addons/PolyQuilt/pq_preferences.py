@@ -20,7 +20,6 @@ from bpy.props import (
     FloatVectorProperty,
     BoolProperty,
     EnumProperty,
-    StringProperty,
 )
 from .utils.addon_updater import (
     AddonUpdaterManager,
@@ -34,69 +33,7 @@ from .subtools import *
 __all__ = [
     "PolyQuiltPreferences" ,
     "PQ_OT_SetupUnityLikeKeymap",
-    "PQ_OT_CheckAddonUpdate" ,
-    "PQ_OT_UpdateAddon" ,
-    "register_updater"
 ]
-
-class PQ_OT_CheckAddonUpdate(bpy.types.Operator):
-    bl_idname = "mesh.pq_ot_check_addon_update"
-    bl_label = "Check Update"
-    bl_description = "Check Add-on Update"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, _):
-        updater = AddonUpdaterManager.get_instance()
-        updater.check_update_candidate()
-
-        return {'FINISHED'}
-
-class PQ_OT_UpdateAddon(bpy.types.Operator):
-    bl_idname = "mesh.pq_ot_update_addon"
-    bl_label = "Update"
-    bl_description = "Update Add-on"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    branch_name : StringProperty(
-        name="Branch Name",
-        description="Branch name to update",
-        default="",
-    )
-
-    def execute(self, _):
-        updater = AddonUpdaterManager.get_instance()
-        updater.update(self.branch_name)
-        #bpy.ops.script.reload
-        return {'FINISHED'}
-
-
-def register_updater(bl_info):
-    config = AddonUpdaterConfig()
-    config.owner = "sakana3"
-    config.repository = "PolyQuilt"
-    config.current_addon_path = os.path.dirname(os.path.realpath(__file__))
-    config.branches = ["master", "develop","Future" ]
-    config.addon_directory = \
-        config.current_addon_path[
-            :config.current_addon_path.rfind(get_separator())]
-    config.min_release_version = bl_info["version"]
-    config.default_target_addon_path = "PolyQuilt"
-    config.target_addon_path = {
-        "master": "Addons{}PolyQuilt".format(get_separator()),
-        "develop": "Addons{}PolyQuilt".format(get_separator()),
-        "Future": "Addons{}PolyQuilt".format(get_separator()),
-    }
-    updater = AddonUpdaterManager.get_instance()
-    updater.init(bl_info, config)
-
-def get_update_candidate_branches(_, __):
-    manager = AddonUpdaterManager.get_instance()
-    if not manager.candidate_checked():
-        return []
-
-    return [(name, name, "") for name in manager.get_candidate_branch_names()]
-
-
 
 class PolyQuiltPreferences(AddonPreferences):
     """Preferences class: Preferences for this add-on"""
@@ -207,12 +144,6 @@ class PolyQuiltPreferences(AddonPreferences):
         default=False
     )
 
-    # for add-on updater
-    updater_branch_to_update : EnumProperty(
-        name="branch",
-        description="Target branch to update add-on",
-        items=get_update_candidate_branches
-    )
 
     loopcut_division : bpy.props.IntProperty(
         name="LoopCut DIVISON",
@@ -342,7 +273,6 @@ class PolyQuiltPreferences(AddonPreferences):
             icon='TRIA_DOWN' if self.extra_setting_expanded
             else 'TRIA_RIGHT')
         if self.extra_setting_expanded :
-            self.draw_updater_ui(layout)
             col = layout.column()
             col.scale_y = 2
             col.operator(PQ_OT_SetupUnityLikeKeymap.bl_idname,
@@ -351,58 +281,6 @@ class PolyQuiltPreferences(AddonPreferences):
             col = layout.column()
             col.scale_y = 1
             layout.row().prop(self, "is_debug" , text = "Debug")
-
-    def draw_updater_ui(self,layout):
-        updater = AddonUpdaterManager.get_instance()
-
-        layout.separator()
-
-        if not updater.candidate_checked():
-            col = layout.column()
-            col.scale_y = 2
-            row = col.row()
-            row.operator(PQ_OT_CheckAddonUpdate.bl_idname,
-                        text="Check 'PolyQuilt' add-on update",
-                        icon='FILE_REFRESH')
-        else:
-            row = layout.row(align=True)
-            row.scale_y = 2
-            col = row.column()
-            col.operator(PQ_OT_CheckAddonUpdate.bl_idname,
-                        text="Check 'PolyQuilt' add-on update",
-                        icon='FILE_REFRESH')
-            col = row.column()
-            if updater.latest_version() != "":
-                col.enabled = True
-                ops = col.operator(
-                    PQ_OT_UpdateAddon.bl_idname,
-                    text="Update to the latest release version (version: {})"
-                    .format(updater.latest_version()),
-                    icon='TRIA_DOWN_BAR')
-                ops.branch_name = updater.latest_version()
-            else:
-                col.enabled = False
-                col.operator(PQ_OT_UpdateAddon.bl_idname,
-                            text="No updates are available.")
-
-            layout.separator()
-            layout.label(text="Manual Update:")
-            row = layout.row(align=True)
-            row.prop(self, "updater_branch_to_update", text="Target")
-            ops = row.operator(
-                PQ_OT_UpdateAddon.bl_idname, text="Update",
-                icon='TRIA_DOWN_BAR')
-            ops.branch_name = self.updater_branch_to_update
-
-            layout.separator()
-            if updater.has_error():
-                box = layout.box()
-                box.label(text=updater.error(), icon='CANCEL')
-            elif updater.has_info():
-                box = layout.box()
-                box.label(text=updater.info(), icon='ERROR')
-
-
 
 
 class PQ_OT_SetupUnityLikeKeymap(bpy.types.Operator) :

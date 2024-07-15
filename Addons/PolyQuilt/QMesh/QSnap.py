@@ -61,8 +61,7 @@ class QSnap :
         self.bvh_list = None
 
     def __update( self , context ) :
-        if context.scene.tool_settings.use_snap \
-            and 'FACE' in context.scene.tool_settings.snap_elements :
+        if context.scene.tool_settings.use_snap:
                 if self.bvh_list == None :
                     self.create_tree(context)
                 else :

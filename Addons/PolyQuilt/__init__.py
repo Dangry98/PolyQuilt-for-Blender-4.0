@@ -11,18 +11,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-bl_info = {
-    "name" : "PolyQuilt",
-    "author" : "Sakana3, port to 4.0 by Dangry",
-    "version": (1, 5, 2),
-    "blender" : (3, 60, 0),
-    "location": "View3D > Mesh > PolyQuilt",
-    "description": "Lowpoly Tool",
-    "warning" : "",
-    "wiki_url": "",
-    "category": "Mesh",
-}
-
 import bpy
 from bpy.utils.toolsystem import ToolDef
 from .pq_operator import *
@@ -41,8 +29,6 @@ classes = (
     MESH_OT_poly_quilt_daemon ,
     PQ_OT_SetupUnityLikeKeymap ,
     PolyQuiltPreferences ,
-    PQ_OT_CheckAddonUpdate ,
-    PQ_OT_UpdateAddon ,
     VIEW3D_PT_tools_polyquilt_options ,
     VIEW3D_PT_tools_polyquilt_gpencil ,
     PQ_OT_DirtyKeymap ,
@@ -55,7 +41,6 @@ classes = (
 def register():
     bpy.app.translations.register(__name__, pq_translation_dict)    
     register_icons()
-    register_updater(bl_info)
 
     for cls in classes:
         bpy.utils.register_class(cls)
