@@ -190,7 +190,7 @@ class PolyQuiltPreferences(AddonPreferences):
                ('KNIFE' , "Knife", "" ) ,
                ('SELECT_BOX' , "Select Box", "" ) ,
                ('SELECT_LASSO' , "Select Lasso", "" ) ],
-        default='ORBIT',
+        default='NONE',
     )
 
     vertex_dissolve_angle : FloatProperty(
