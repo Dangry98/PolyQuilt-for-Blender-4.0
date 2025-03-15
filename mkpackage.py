@@ -1,23 +1,14 @@
-# coding: UTF-8
 import os
-import re
-import zipfile
 import shutil
 
-modulename = "PolyQuilt"
-package_folder = os.getcwd() + "/Addons/PolyQuilt"
+modulename = "PolyQuilt_Fork"
+package_folder = os.getcwd() + "/Addons/PolyQuilt_Fork"
+filename = os.path.dirname(os.getcwd()) + "/" + modulename
 
-version = "0.0.0"
-with open( package_folder + "/__init__.py", encoding= "utf-8" ) as f:
-    line = f.readline()
-    while line :
-        if "\"version\"" in line :
-            vtext =  line.split('(')[-1].split(')')[0]
-            vtext = [ v.replace(" ","") for v in vtext.split(',') ]
-            version =  '.'.join(vtext)
-        line = f.readline()
-
-filename = modulename + "_v" + version 
-
+for root, dirs, files in os.walk(package_folder):
+    if '__pycache__' in dirs:
+        shutil.rmtree(os.path.join(root, '__pycache__'))
+        
 shutil.make_archive( filename , 'zip', root_dir= package_folder )
 
+print("Package created: " + filename + ".zip")
