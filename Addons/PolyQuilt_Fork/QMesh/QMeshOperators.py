@@ -233,6 +233,7 @@ class QMeshOperators :
 
     def AddFace( self , verts , normal = None , is_mirror = None ) :
         self.ensure_lookup_table()
+        verts = list(verts)
         if len(verts) < 3:
             return None
         face = self.bm.faces.new( verts )

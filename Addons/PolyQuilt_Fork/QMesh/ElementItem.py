@@ -26,7 +26,8 @@ from ..utils.dpi import *
 __all__ = ['ElementItem']
 
 class EmptyElement :
-    def __init__(self) :
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         pass
 
     @property

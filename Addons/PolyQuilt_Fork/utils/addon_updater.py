@@ -163,7 +163,8 @@ def _compare_version(ver1, ver2):
 
 
 class AddonUpdaterConfig:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # Name of owner
         self.owner = ""
 
@@ -195,7 +196,8 @@ class AddonUpdaterConfig:
 
 
 class UpdateCandidateInfo:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.name = ""
         self.url = ""
         self.group = ""   # BRANCH|RELEASE
@@ -213,7 +215,8 @@ class AddonUpdaterManager:
     __error = ""
     __info = ""
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         raise NotImplementedError("Not allowed to call constructor")
 
     @classmethod

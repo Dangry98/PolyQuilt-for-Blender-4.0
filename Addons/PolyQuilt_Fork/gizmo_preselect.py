@@ -22,7 +22,8 @@ from .pq_tool import *
 class PQ_Gizmo_Preselect( bpy.types.Gizmo):
     bl_idname = "MESH_GT_PQ_Preselect"
 
-    def __init__(self) :
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.bmo = None
         self.currentElement = None
         self.preferences = bpy.context.preferences.addons[__package__].preferences
@@ -168,7 +169,8 @@ class PQ_GizmoGroup_Base(bpy.types.GizmoGroup):
 
     running_polyquilt = False
 
-    def __init__(self) :
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.gizmo = None
 
     def __del__(self) :

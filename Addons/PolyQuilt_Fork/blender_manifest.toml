@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "PolyQuilt_Fork"
-version = "1.45.5"
+version = "1.45.6"
 name = "PolyQuilt Retopology Tool [Fork]"
 tagline = "Retopology Tool for Blender" 
 maintainer = "Sakana3, Dan-Gry"
