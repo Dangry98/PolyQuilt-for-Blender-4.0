@@ -13,7 +13,6 @@
 
 import sys
 import bpy
-import bgl
 import blf
 import gpu
 import bmesh

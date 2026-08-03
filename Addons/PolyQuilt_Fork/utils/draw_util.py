@@ -156,10 +156,11 @@ def draw_Poly3D(context, verts, color=(1, 1, 1, 1), hide_alpha=0.5):
     batch_for_shader(shader3D, 'TRIS', {"pos": verts}, indices=polys).draw(shader3D)
 
 def draw_pivots3D( poss , radius , color = (1,1,1,1) ):
+    shader3D = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
     shader3D.bind()
     shader3D.uniform_float("color", color)
+    gpu.state.point_size_set(radius)
     batch_draw(shader3D, 'POINTS', {"pos": poss} )
-
 
 
 def draw_Face3D( obj , bm : bmesh.types.BMesh , face : bmesh.types.BMFace , color = (1,1,1,1) , isFill = True ):
@@ -222,7 +223,7 @@ def drawElementHilight3DFunc( obj  , bm : bmesh.types.BMesh , element, radius ,w
         co = copy.copy(element.co)
         v = matrix_world @ co
         def draw() :
-            draw_pivots3D( (v,) , radius , color )
+            draw_pivots3D( (v,) , radius , (color) )
         return draw
 
     elif isinstance(element, bmesh.types.BMFace):

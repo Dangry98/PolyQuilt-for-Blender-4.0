@@ -61,5 +61,5 @@ class SubToolFaceExtrude(SubToolMove) :
             else :
                 newMirror = ret[0]
             newFace.setup_mirror(newMirror)
-    
+        
         super().__init__(op,newFace,startMousePos,'NORMAL',newMirror)

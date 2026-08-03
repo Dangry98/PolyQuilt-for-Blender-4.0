@@ -19,7 +19,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 from . import dpi
-from . import addon_updater
 from . import pqutil
 from . import mouse_event_util
 

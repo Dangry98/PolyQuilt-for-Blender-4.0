@@ -21,11 +21,7 @@ from bpy.props import (
     BoolProperty,
     EnumProperty,
 )
-from .utils.addon_updater import (
-    AddonUpdaterManager,
-    AddonUpdaterConfig,
-    get_separator,
-)
+
 from bpy.types import AddonPreferences
 from .pq_icon import *
 from .subtools import *
@@ -99,16 +95,16 @@ class PolyQuiltPreferences(AddonPreferences):
     highlight_vertex_size : FloatProperty(
         name="Highlight Vertex Size",
         description="Highlight Vertex Size",
-        default= 3,
+        default= 6,
         min=0.5,
-        max=8.0)
+        max=16.0)
 
     highlight_line_width : FloatProperty(
         name="Highlight Line Width",
         description="Highlight Line Width",
         default=1.0,
         min=0.1,
-        max=10.0)
+        max=3.0)
 
     highlight_face_alpha : FloatProperty(
         name="Highlight Face Alpha",

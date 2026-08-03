@@ -338,7 +338,7 @@ class ElementItem :
                     funcs.append( draw_div )
                 if edge_pivot :
                     def draw_pivot() :
-                        draw_util.draw_pivots3D( (self.hitPosition,) , preferences.highlight_line_width * 3 , (1,1,1,1) )
+                        draw_util.draw_pivots3D( (self.hitPosition,) , preferences.highlight_vertex_size, (1,1,1,1) )
                     funcs.append( draw_pivot )
                 if marker and len(element.link_faces) <= 1 :
                     v0 = pqutil.location_3d_to_region_2d(  self.__qmesh.local_to_world_pos(element.verts[0].co) )

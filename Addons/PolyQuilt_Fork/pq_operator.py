@@ -222,11 +222,11 @@ class MESH_OT_poly_quilt_base(bpy.types.Operator):
 
         self.mouse_pos = mathutils.Vector((event.mouse_region_x, event.mouse_region_y))                
 
-        if event.type == 'ESC':
+        if event.type == 'ESC' or event.type == 'RET':
             if self.currentSubTool is not None :
                 self.currentSubTool.OnExit()     
                 self.currentSubTool = None 
-
+    
         if self.currentSubTool is not None :
             ret = self.currentSubTool.Update(context, event)
             context.window.cursor_set( self.currentSubTool.CurrentCursor() )
@@ -262,9 +262,14 @@ class MESH_OT_poly_quilt_base(bpy.types.Operator):
 
         if context.area.type == 'VIEW_3D' and context.mode == 'EDIT_MESH' :
             self.preselect = PQ_GizmoGroup_Base.get_gizmo( context.region_data )
-            if self.preselect == None or self.preselect.bmo  == None :
-                self.report({'WARNING'}, "Gizmo Error" )
-                return {'CANCELLED'}            
+            if self.preselect == None or self.preselect.bmo  == None :  
+                bpy.ops.wm.tool_set_by_id(name="mesh_tool.poly_quilt") # hack if error, restarting tool, ussaly when tool is runnig and switching workspace
+                try:
+                    if self.preselect.currentElement == None : # most common error, skip for user
+                        pass
+                    self.report({'WARNING'}, "PolyQuilt Tool Error" )
+                except:
+                    return {'CANCELLED'}            
 
             if self.preselect.currentElement == None :
                 return {'CANCELLED'} 
