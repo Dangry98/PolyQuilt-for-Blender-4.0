@@ -30,7 +30,7 @@ from .subtool_util import vert_array_util
 
 class SubToolMakePoly(MainTool) :
     name = "MakePolyTool"
-
+    currentType = None
     def NewByEdge( op,startElement , button ) :
         return SubToolMakePoly(op,startElement , button , "EDGE")
 
@@ -49,6 +49,7 @@ class SubToolMakePoly(MainTool) :
             self.currentTarget = ElementItem( self.bmo , vert , self.mouse_pos , self.bmo.local_to_world_pos(vert.co) , 0 )
 
         elif startElement.isEdge :
+            self.currentType = "EDGE"
             self.currentTarget = self.edge_split( startElement )
             self.bmo.UpdateMesh()
         else :
@@ -251,10 +252,10 @@ class SubToolMakePoly(MainTool) :
         dirty = False
 
         if target.element not in self.vert_array.verts :
-            if self.bmo.is_mirror_mode :
-                if target.mirror == None and target.is_x_zero is False :
-                    self.bmo.AddVertex( self.bmo.mirror_pos( target.element.co ) , False )
-                    self.bmo.UpdateMesh()
+            # if self.bmo.is_mirror_mode :
+            #     if target.mirror == None and target.is_x_zero is False :
+            #         self.bmo.AddVertex( self.bmo.mirror_pos( target.element.co ) , False )
+            #         self.bmo.UpdateMesh()
 
             self.vert_array.add( target.element )
             ret = True
@@ -365,12 +366,12 @@ class SubToolMakePoly(MainTool) :
         self.bmo.UpdateMesh()
         QSnap.adjust_verts( self.bmo.obj , [new_vert] , self.preferences.fix_to_x_zero )
         self.bmo.UpdateMesh()
-
+        #self.bmo.mirror_pos(new_vert.co)
         newItem = ElementItem.FormVert( self.bmo , new_vert )
-        if self.bmo.is_mirror_mode and newItem.mirror == None and newItem.is_x_zero is False :
-            self.bmo.AddVertex( self.bmo.mirror_pos( new_vert.co ) , False )
-            self.bmo.UpdateMesh()
-            newItem.setup_mirror()
+        # if self.bmo.is_mirror_mode and newItem.mirror == None and newItem.is_x_zero is False :
+        #     self.bmo.AddVertex(new_vert.co  , False )
+        #     self.bmo.UpdateMesh()
+        #     newItem.setup_mirror()
         return newItem
 
     def check_splite( self ) :
@@ -424,7 +425,10 @@ class SubToolMakePoly(MainTool) :
                         facesp = bmesh.utils.face_split_edgenet( self.vert_array.faces[-1] , self.vert_array.edges )
                         self.bmo.UpdateMesh()
                         mirror_edges = [ self.bmo.find_mirror(e) for e in self.vert_array.edges ]
-                        facesp = bmesh.utils.face_split_edgenet( mirror_face , mirror_edges )
+                        try:
+                            facesp = bmesh.utils.face_split_edgenet( mirror_face , mirror_edges )
+                        except:
+                            pass
                 else :
                     facesp = bmesh.utils.face_split_edgenet( self.vert_array.faces[-1] , self.vert_array.edges )
             else :

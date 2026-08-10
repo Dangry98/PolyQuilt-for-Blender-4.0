@@ -117,9 +117,10 @@ class SubToolEdgeLoopTweak(MainTool) :
         elif event.type == 'LEFTMOUSE' :
             if event.value == 'RELEASE' :
                 if self.snap_edges :
-                    threshold = bpy.context.scene.tool_settings.double_threshold
+                    threshold = self.preferences.pq_double_threshold
                     elem = list(self.snap_edges.keys()) + list(self.snap_edges.values())
-                    bmesh.ops.remove_doubles( self.bmo.bm , verts = list(set(elem)) , dist = threshold )
+                    if self.preferences.pq_double_threshold_switch:
+                        bmesh.ops.remove_doubles( self.bmo.bm , verts = list(set(elem)) , dist = threshold )
                     self.bmo.UpdateMesh()
                 return 'FINISHED'
         else :

@@ -121,7 +121,13 @@ class QSnap :
     def adjust_point( cls , world_pos : mathutils.Vector , is_fix_to_x_zero = False) :
         if cls.instance != None :
             location , norm , index = cls.instance.__find_nearest( world_pos )
+            if location is None :
+                return world_pos , mathutils.Vector( (0,0,1) )
+            if norm is None :
+                norm = mathutils.Vector( (0,0,1) )
             if is_fix_to_x_zero and QMeshOperators.is_x_zero_pos(location) :
+                location = location.copy()
+                norm = norm.copy()
                 location.x = 0
                 norm.x = 0
                 norm.normalize()
@@ -136,7 +142,11 @@ class QSnap :
             if location == None :
                 location , norm , index = cls.instance.__find_nearest( world_pos )
             if location != None :
+                if norm is None :
+                    norm = mathutils.Vector( (0,0,1) )
                 if is_fix_to_x_zero and QMeshOperators.is_x_zero_pos(location) :
+                    location = location.copy()
+                    norm = norm.copy()
                     location.x = 0
                     norm.x = 0
                     norm.normalize()                    

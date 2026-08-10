@@ -100,6 +100,10 @@ class SubToolAutoQuad(SubToolEx) :
                     return mat @ v.co
 
             vs = [ calcVert(v) for v in verts ]
+            if not vs:
+                def Dummy() :
+                    pass
+                return Dummy
             vs.append( vs[0] )
             if gizmo.bmo.is_mirror_mode :
                 inv = mat.inverted()

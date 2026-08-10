@@ -29,13 +29,14 @@ from .subtool_util import move_component_module
 class SubToolMove(SubTool) :
     name = "MoveTool"
 
-    def __init__(self,op,startTarget,startMousePos, move_type = None, mirror = None  ) :
+    def __init__(self,op,startTarget,startMousePos, move_type = None, mirror = None ) :
         super().__init__(op)
         self.currentTarget = startTarget
         self.currentTarget.set_snap_div( 0 )        
         self.snapTarget = ElementItem.Empty()
         self.target_orig = { v : v.co.copy()  for v in startTarget.verts if v != None }
 
+ 
         mt = move_component_module.check_move_type( startTarget , op.move_type , move_type )
         self.move_component_module = move_component_module( self.bmo , startTarget , startMousePos , mt , self.preferences.fix_to_x_zero )
         self.move_component_module.set_geoms( [startTarget.element] )
@@ -126,7 +127,8 @@ class SubToolMove(SubTool) :
 
         elif event.type == 'LEFTMOUSE' : 
             if event.value == 'RELEASE' :
-                threshold = bpy.context.scene.tool_settings.double_threshold
+                #threshold = bpy.context.scene.tool_settings.double_threshold
+                threshold = self.preferences.pq_double_threshold
                 verts = set( self.move_component_module.mirror_set.keys() ) | set( v for v in self.move_component_module.mirror_set.values() if v != None )
                 if self.snapTarget.isVert :
                     verts = verts | self.bmo.find_near(self.bmo.obj.matrix_world @ self.snapTarget.element.co)
@@ -134,8 +136,10 @@ class SubToolMove(SubTool) :
                     verts = verts | self.bmo.find_near(self.bmo.obj.matrix_world @ self.snapTarget.element.verts[0].co)
                     verts = verts | self.bmo.find_near(self.bmo.obj.matrix_world @ self.snapTarget.element.verts[1].co)
                 if len(verts) > 1 :
-                    bmesh.ops.remove_doubles( self.bmo.bm , verts = [ v for v in verts if v ] , dist = threshold )
-                    self.bmo.UpdateMesh()
+                    switch = self.preferences.pq_double_threshold_switch
+                    if switch:
+                        bmesh.ops.remove_doubles( self.bmo.bm , verts = [ v for v in verts if v ] , dist = threshold )
+                        self.bmo.UpdateMesh()
 
                 return 'FINISHED'
         else :

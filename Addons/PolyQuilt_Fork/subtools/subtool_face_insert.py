@@ -24,8 +24,10 @@ from ..utils import draw_util
 from ..QMesh import *
 from ..utils.dpi import *
 from .subtool import SubTool
+from .subtool_move import SubToolMove
 
 class SubToolFaceInsert(SubTool) :
+#class SubToolFaceInsert(SubToolMove) :
     name = "FaceInsertTool"
 
     def __init__(self,op, target ) :

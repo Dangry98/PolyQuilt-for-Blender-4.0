@@ -233,11 +233,20 @@ class QMeshOperators :
 
     def AddFace( self , verts , normal = None , is_mirror = None ) :
         self.ensure_lookup_table()
-        verts = list(verts)
-        if len(verts) < 3:
-            return None
-        face = self.bm.faces.new( verts )
-        if face == None :
+        try:
+            face = self.bm.faces.new( verts )
+        except ValueError:
+            # face already exists: find and reuse it
+            face = None
+            vset = set(verts)
+            for f in self.bm.faces:
+                try:
+                    if set(f.verts) == vset:
+                        face = f
+                        break
+                except Exception:
+                    continue
+        if face is None :
             return None
 
         linkCount = 0
@@ -427,11 +436,11 @@ class QMeshOperators :
 
     def edge_split_from_position( self , edge , refPos , is_mirror = None):
         mirror_edge = None
+        new_edge = None
         if self.check_mirror(is_mirror) and self.is_x_zero_pos( refPos ) is False :
             mirror_edge = self.find_mirror( edge , False )
 
-        fac = self.__calc_split_fac( edge , refPos )
-        new_edge , new_vert = bmesh.utils.edge_split( edge , edge.verts[0] , fac )
+
 
         if mirror_edge is not None :
             if new_edge is mirror_edge :
@@ -439,7 +448,8 @@ class QMeshOperators :
                     mirror_edge = new_edge
             rfac = self.__calc_split_fac( mirror_edge , self.mirror_pos(refPos) )
             bmesh.utils.edge_split( mirror_edge , mirror_edge.verts[0] , rfac )
-
+        fac = self.__calc_split_fac(edge , refPos)
+        new_edge , new_vert = bmesh.utils.edge_split(edge , edge.verts[0] , fac)
         return new_edge , new_vert
 
 

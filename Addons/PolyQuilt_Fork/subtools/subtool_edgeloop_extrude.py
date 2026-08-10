@@ -191,7 +191,8 @@ class SubToolEdgeLoopExtrude(MainTool) :
         self.move_component_module.draw_3D(context)
 
     def MakePoly( self ) :
-        threshold = bpy.context.scene.tool_settings.double_threshold
+        #threshold = bpy.context.scene.tool_settings.double_threshold
+        threshold = self.preferences.pq_double_threshold
 
         if self.move_component_module.move_distance <= threshold :
             return
@@ -221,7 +222,7 @@ class SubToolEdgeLoopExtrude(MainTool) :
                 self.bmo.UpdateMesh()
 
         newVerts = set( sum( ( tuple(f.verts) for f in newFaces ) , () ) )
-
-        bmesh.ops.remove_doubles( self.bmo.bm , verts = list(newVerts) , dist = threshold )
+        if self.preferences.pq_double_threshold_switch:
+            bmesh.ops.remove_doubles( self.bmo.bm , verts = list(newVerts) , dist = threshold )
 
         self.bmo.UpdateMesh()

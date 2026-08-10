@@ -288,7 +288,8 @@ class SubToolEdgeLoopCut(MainTool) :
                 elif isinstance( e, bmesh.types.BMEdge ) :
                     verts.add( e.verts[0] )
                     verts.add( e.verts[1] )
-            bmesh.ops.remove_doubles( self.bmo.bm , verts =  list(verts) , dist = bpy.context.scene.tool_settings.double_threshold )
+            if self.preferences.pq_double_threshold_switch :
+                bmesh.ops.remove_doubles( self.bmo.bm , verts =  list(verts) , dist = self.preferences.pq_double_threshold )
 
         self.bmo.UpdateMesh()
 

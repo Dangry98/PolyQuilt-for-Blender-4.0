@@ -41,25 +41,42 @@ class SubToolFaceExtrude(SubToolMove) :
         verts = [ [v for v in f.verts] for f in faces ]
         is_convex = all( [ len( e.link_faces ) > 1 for e in startTarget.element.edges ] )
 
+        # if region :
+        #     ret = bmesh.ops.extrude_face_region( op.bmo.bm , geom  = faces, use_normal_flip = False , use_select_history = False )
+        #     ret = [ g for g in ret['geom'] if isinstance( g , bmesh.types.BMFace ) ]
+        # else :
+        #     ret = bmesh.ops.extrude_discrete_faces( op.bmo.bm , faces = faces, use_normal_flip = True , use_select_history = False )
+        #     ret = ret['faces']
+        region = True
         if region :
-            ret = bmesh.ops.extrude_face_region( op.bmo.bm , geom  = faces, use_normal_flip = False , use_select_history = False )        
-            ret = [ g for g in ret['geom'] if isinstance( g , bmesh.types.BMFace ) ] 
-        else :
-            ret = bmesh.ops.extrude_discrete_faces( op.bmo.bm , faces = faces, use_normal_flip = True , use_select_history = False )        
-            ret = ret['faces']
+            for f in faces :
+                ret = bmesh.ops.extrude_discrete_faces(op.bmo.bm , faces = [f] , use_normal_flip = True , use_select_history = False)
+                ret = ret['faces']
 
-        if not is_convex:
-            for vs in verts :
-                op.bmo.AddFace( reversed(vs) , normal = None , is_mirror = False )
+                if not is_convex:
+                    for vs in verts :
+                        op.bmo.AddFace( reversed(vs) , normal = None , is_mirror = False )
 
-        op.bmo.UpdateMesh()
+                op.bmo.UpdateMesh()
+                newFace = ElementItem( op.bmo , element = ret[0] , coord = startTarget.coord , hitPosition = startTarget.hitPosition )
+                if op.bmo.is_mirror_mode :
+                    if len(faces) > 1 :
+                        if f == mirror :
+                            newMirror = ret[0]
+                    else :
+                        newMirror = ret[0]
+                    newFace.setup_mirror(newMirror)
+              
+                super().__init__(op,newFace,startMousePos,'NORMAL',newMirror)
 
-        newFace = ElementItem( op.bmo , element = ret[0] , coord = startTarget.coord , hitPosition = startTarget.hitPosition )
-        if op.bmo.is_mirror_mode :
-            if len(faces) > 1 :
-                newMirror = ret[1]
-            else :
-                newMirror = ret[0]
-            newFace.setup_mirror(newMirror)
-        
-        super().__init__(op,newFace,startMousePos,'NORMAL',newMirror)
+        # else :
+        #     ret = bmesh.ops.extrude_discrete_faces( op.bmo.bm , faces = faces, use_normal_flip = True , use_select_history = False )
+        #     ret = ret['faces']
+        #     if not is_convex:
+        #         for vs in verts:
+        #             op.bmo.AddFace(reversed(vs) , normal = None , is_mirror = False)
+        #
+        #     op.bmo.UpdateMesh()
+        #
+        #     newFace = ElementItem(op.bmo , element = ret[0] , coord = startTarget.coord , hitPosition = startTarget.hitPosition)
+        #     super().__init__(op , newFace , startMousePos , 'NORMAL' , newMirror)
